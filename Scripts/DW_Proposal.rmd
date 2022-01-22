@@ -1,0 +1,174 @@
+---
+title: "Proposal"
+author: "Cassie Malcom"
+date: "1/20/2022"
+output: html_document
+---
+
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE,
+                      fig.width = 9, 
+                      fig.height = 9)
+```
+
+```{r}
+library(edld652)
+```
+
+```{r}
+get_documentation("EDFacts_acgr_sch_2011_2019")
+```
+
+Possible Graphics: state level graduation rates, graduation rates by school size, 
+Abbreviations Code List: FIPST = identifies the state, LEAID & LEANM identify the specific school district, 
+Cells with 1-5 students are suppressed. These are coded PS.
+Medium sized groups are binned (e.g. "< 20%"). The binning method depends on the size of the group. See Table 2 for more details.
+```{r}
+grad_rates <- get_data("EDFacts_acgr_lea_2011_2019")
+grad_rates
+```
+
+```{r}
+state_info <- readr::read_csv("https://github.com/kjhealy/fips-codes/raw/master/state_fips_master.csv")
+state_info
+```
+
+```{r}
+library(dplyr) # could also just load the entire tidyverse
+grad_rates <- grad_rates %>% 
+  mutate(fips = readr::parse_number(FIPST))
+```
+
+```{r}
+grad_rates <- left_join(grad_rates, state_info)
+```
+
+Can we make this a selectable table where you can group by state and it shows the aggregate rate?
+```{r}
+grad_rates %>% 
+  select(state_name, ALL_RATE)
+```
+
+```{r}
+fiscal_18 <- get_data("NCES_CCD_fiscal_district_2018")
+
+# select only the variables we want
+fiscal_18 <- fiscal_18 %>% 
+  select(FIPST, LEAID, TOTALREV)
+fiscal_18
+```
+
+```{r}
+grad_rates <- left_join(grad_rates, filter(fiscal_18, TOTALREV > 0))
+grad_rates
+```
+
+```{r}
+library(ggplot2)
+theme_set(theme_minimal(15))
+
+ggplot(grad_rates, aes(TOTALREV, ALL_RATE)) +
+  geom_point()
+```
+
+```{r}
+grad_rates %>% 
+  count(ALL_RATE)
+```
+
+```{r}
+grad_rates %>% 
+  count(ALL_RATE) %>% 
+  tidyr::separate(ALL_RATE, c("lower", "upper"), sep = "-")
+```
+
+```{r}
+grad_rates %>% 
+  count(ALL_RATE) %>% 
+  tidyr::separate(ALL_RATE, c("lower", "upper"), sep = "-") %>% 
+  filter(!grepl("G|L|P", lower)) %>% 
+  mutate(
+    upper = ifelse(is.na(upper), lower, upper),
+    lower = as.numeric(lower),
+    upper = as.numeric(upper)
+  ) %>% 
+  rowwise() %>% 
+  mutate(mean = mean(c(lower, upper))) %>% 
+  ungroup()
+```
+
+```{r}
+grad_rates <- grad_rates %>% 
+  tidyr::separate(ALL_RATE, c("lower", "upper"), sep = "-") %>% 
+  filter(!grepl("G|L|P", lower)) %>% 
+  mutate(
+    upper = ifelse(is.na(upper), lower, upper),
+    lower = as.numeric(lower),
+    upper = as.numeric(upper)
+  ) %>% 
+  rowwise() %>% 
+  mutate(mean = mean(c(lower, upper))) %>% 
+  ungroup()
+```
+
+```{r}
+ggplot(grad_rates, aes(TOTALREV, mean)) +
+  geom_point()
+```
+
+```{r}
+ggplot(grad_rates, aes(TOTALREV, mean)) +
+  geom_point() +
+  scale_x_log10()
+```
+
+```{r}
+ggplot(grad_rates, aes(TOTALREV, mean)) +
+  geom_point() +
+  scale_x_log10(labels = scales::dollar)
+```
+
+```{r}
+ggplot(grad_rates, aes(TOTALREV, mean)) +
+  geom_point(
+    stroke = 0,
+    alpha = 0.3,
+    color = "gray20",
+    size = 2
+  ) +
+  scale_x_log10("Total District Revenue", labels = scales::dollar) +
+  labs(
+    y = "Approximate average graduation rate",
+    title = stringr::str_wrap("School districts with higher total revenue generally have higher graduation rates", 60),
+    subtitle = "Each point represents a school district",
+    caption = "Note the log transformation of the x-axis"
+  ) +
+  theme(plot.title.position = "plot")
+```
+
+```{r}
+library(geofacet)
+
+grad_rates %>% 
+  tidyr::drop_na(state_abbr) %>% 
+ggplot(aes(TOTALREV, mean)) +
+  geom_point(
+    stroke = 0,
+    alpha = 0.3,
+    color = "gray20",
+    size = 2
+  ) +
+  facet_geo(~state_abbr) +
+  scale_x_log10("Total District Revenue", labels = scales::dollar) +
+  labs(
+    y = "Approximate average graduation rate",
+    title = stringr::str_wrap("School districts with higher total revenue generally have higher graduation rates", 60),
+    subtitle = "Each point represents a school district",
+    caption = "Note the log transformation of the x-axis"
+  ) +
+  theme(
+    plot.title.position = "plot",
+    axis.text.x = element_blank()
+  )
+```
+
