@@ -1,5 +1,5 @@
 ---
-title: "Proposal"
+title: "Data Walkthrough for Proposal"
 author: "Cassie Malcom"
 date: "1/20/2022"
 output: html_document
@@ -11,44 +11,54 @@ knitr::opts_chunk$set(echo = TRUE,
                       fig.height = 9)
 ```
 
+Overview of all the data sets included in the edld652 package
 ```{r}
 library(edld652)
+list_datasets()
 ```
-
+Downloads word file with data documentation and code keys
+* Cells with 1-5 students are suppressed. These are coded PS.
+* Medium sized groups are binned (e.g. "< 20%"). The binning method depends on the size of the group. See Table 2 for more details.
 ```{r}
 get_documentation("EDFacts_acgr_sch_2011_2019")
 ```
 
-Possible Graphics: state level graduation rates, graduation rates by school size, 
-Abbreviations Code List: FIPST = identifies the state, LEAID & LEANM identify the specific school district, 
-Cells with 1-5 students are suppressed. These are coded PS.
-Medium sized groups are binned (e.g. "< 20%"). The binning method depends on the size of the group. See Table 2 for more details.
+Downloads the school district level version of the data
+Abbreviations Code List: FIPST = identifies the state, LEAID & LEANM identify the specific school district
+_Possible Graphics:_ state level graduation rates, graduation rates by school size
 ```{r}
 grad_rates <- get_data("EDFacts_acgr_lea_2011_2019")
 grad_rates
 ```
 
+Downloads state names from Kieren Healy's data on GitHub
+Note the below code uses readr to read in the CSV, and the link is changed slightly so it says "raw" instead of "blob". This is a general method for reading in any CSV from GitHub.
 ```{r}
 state_info <- readr::read_csv("https://github.com/kjhealy/fips-codes/raw/master/state_fips_master.csv")
 state_info
 ```
 
+Note that the FIPS is coded slightly differently in this file - it’s an integer. So to join these files need to first change "FIPST" so it is also an integer
 ```{r}
 library(dplyr) # could also just load the entire tidyverse
 grad_rates <- grad_rates %>% 
   mutate(fips = readr::parse_number(FIPST))
 ```
 
+Joins FIPST to state name and abbreviation
 ```{r}
 grad_rates <- left_join(grad_rates, state_info)
 ```
 
-Can we make this a selectable table where you can group by state and it shows the aggregate rate?
+ALL_RATE is the graduation rate of all students who formed the adjusted cohort in school year 2018-19
+_Possible Table:_ Can we make this a selectable table where you can group by state and it shows the aggregate rate?
 ```{r}
 grad_rates %>% 
   select(state_name, ALL_RATE)
 ```
 
+Downloads the lunch program data set
+Assuming TOTALREV = total revenue per school district (LEAID)
 ```{r}
 fiscal_18 <- get_data("NCES_CCD_fiscal_district_2018")
 
@@ -58,11 +68,14 @@ fiscal_18 <- fiscal_18 %>%
 fiscal_18
 ```
 
+There are negative values in the TOTALREV column, which appear to indicate total revenue is suppressed, and they are not covered in the documentation so removing them from data set while joining the lunch program data set to the grad_rates data set.
 ```{r}
 grad_rates <- left_join(grad_rates, filter(fiscal_18, TOTALREV > 0))
 grad_rates
 ```
 
+Scatterplot 1 - DNU
+Hard to visualize due to the binning of the Cohort Graduation rate. Need to transform graduation rate to an approximately numeric scale by putting the rate in the middle of the range, if there is a range, and otherwise taking the exact percent.
 ```{r}
 library(ggplot2)
 theme_set(theme_minimal(15))
@@ -71,17 +84,20 @@ ggplot(grad_rates, aes(TOTALREV, ALL_RATE)) +
   geom_point()
 ```
 
+Visualizing the graduation rate ranges in the ALL_RATE column
 ```{r}
 grad_rates %>% 
   count(ALL_RATE)
 ```
 
+Split the ALL_RATE column based on the "-" character. Get a warning because there are many cases where the range is not binned.
 ```{r}
 grad_rates %>% 
   count(ALL_RATE) %>% 
   tidyr::separate(ALL_RATE, c("lower", "upper"), sep = "-")
 ```
 
+Drops any cases that cannot easily be transformed to numeric (e.g., "GE50", "PS"), fills in the missing values with the lower value, and then calculates the mean. Note when calculate the mean need to do so rowwise().
 ```{r}
 grad_rates %>% 
   count(ALL_RATE) %>% 
@@ -97,6 +113,7 @@ grad_rates %>%
   ungroup()
 ```
 
+Used count() above to basically verify that it was all working, but now need to do the same thing to actual dataframe.
 ```{r}
 grad_rates <- grad_rates %>% 
   tidyr::separate(ALL_RATE, c("lower", "upper"), sep = "-") %>% 
@@ -111,23 +128,31 @@ grad_rates <- grad_rates %>%
   ungroup()
 ```
 
+Scatterplot 2 - DNU
+There is a lot of data bunched up - need to try a log transformation of the x-axis.
 ```{r}
 ggplot(grad_rates, aes(TOTALREV, mean)) +
   geom_point()
 ```
 
+Scatterplot 3 - DNU
+Uses log transformation
 ```{r}
 ggplot(grad_rates, aes(TOTALREV, mean)) +
   geom_point() +
   scale_x_log10()
 ```
 
+Scatterplot 4 - DNU
+Adds in x labels
 ```{r}
 ggplot(grad_rates, aes(TOTALREV, mean)) +
   geom_point() +
   scale_x_log10(labels = scales::dollar)
 ```
 
+Scatterplot 5 - Great!
+Style updates
 ```{r}
 ggplot(grad_rates, aes(TOTALREV, mean)) +
   geom_point(
@@ -146,6 +171,8 @@ ggplot(grad_rates, aes(TOTALREV, mean)) +
   theme(plot.title.position = "plot")
 ```
 
+Scatterplot 6 - Final
+Groups graduation rate by state, but lacks the x-axis labels
 ```{r}
 library(geofacet)
 
@@ -170,5 +197,18 @@ ggplot(aes(TOTALREV, mean)) +
     plot.title.position = "plot",
     axis.text.x = element_blank()
   )
+```
+
+Descriptive statistics for the varable "mean", which is the mean graduation rate per school district
+```{r}
+ describe(grad_rates$mean)
+```
+
+Histogram
+```{r}
+library(ggplot2)
+
+ggplot(grad_rates, aes(x = mean)) +
+geom_histogram()
 ```
 
