@@ -29,105 +29,38 @@ pacman::p_load(edld652, tidyverse, geofacet, psych, rio, here, forcats)
 
 **Theme – Underrepresented Populations**
 
-1. How does student and teacher ethnicity vary by state in 2019 (latest year of data available)?
+1. How does student and teacher ethnicity vary by state in 2019 (latest year of data available)? Does this discrepancy affect student outcomes (graduation rates)? (RQ1)
 - **Hypothesis:** Graduation rates for underrepresented students are better in states with higher teacher diversity.
-2. Does COVID pandemic affect graduation rates for students by ethnicity? (Would need 2020 graduation rates along with COVID data - can we get access?) 
-3. Fiscal data by student demographic (race/ethnicity/FRLP status/ Disability/ ELL status?) by state/school district in 2018
+2. Does COVID pandemic affect graduation rates for students by ethnicity? (Would need 2020 graduation rates along with COVID data - can we get access?) (RQ2)
+3. Do some states prefer one sub-group over another based on how funds are alloted? Does a difference exist in the annual funding of schools that serve more underrepresented student population? We will use the Fiscal data by student demographic (race/ethnicity/FRLP status/ Disability/ ELL status?) by state/school district in 2018. (RQ3)
 
 ### Preliminary ideas (even hand sketches) of different visualizations
 
-1. Mapping to US graphic by state for graduation rates, teacher/student ethnicity, and ELL students (this could be multiple maps of different factors)
-2. Timeline or scale of pre- vs. post-COVID graduation rates by ethnicity
-3. Tables or line graphs, dumbbell plot
-4. Overview of website design/dashboard: three tabs for each questions
+- For RQ1:, Mapping to US graphic by state for teacher/student ethnicity, and ELL status (this could be multiple maps of different teacher and student ethnicity; ELL could be another categorical variable)
+    - Maps could have dot plots representing raw counts, or proportions on a continuous scale. Some examples-
+        - Source: [demographics.coopercenter.org](https://demographics.coopercenter.org/racial-dot-map)
+        
+![Figure 1](Images/example-dotplot.jpg)
+        - Source: [census.gov](https://www.census.gov/newsroom/blogs/random-samplings/2021/08/measuring-racial-ethnic-diversity-2020-census.html)
+   
+![Figure 2](Images/example_map.jpg)
+    - For graduation rates, can use dumbbell plot to show the difference in some major groups for each state
+- For RQ2: Timeline or scale of pre- vs. post-COVID graduation rates by ethnicity
+- Tables or line graphs, dumbbell plot
+- For RQ3: Still thinking how to unpack the information from the datasets, and what variable to focus on.
+- General overview of website design/dashboard: three tabs for each questions
 
-![Figure 1 - Overview of website](Images/website-overview.jpg){width=500px}
+![Figure 3 - Overview of website](Images/website-overview.jpg){width=500px}
 
 ### Some documentation that you have played with the course data some
 
-<!-- Overview of all the data sets included in the edld652 package -->
-```{r, eval = FALSE}
-
-list_datasets()
-```
-<!-- Downloads word file with data documentation and code keys -->
-<!-- * Cells with 1-5 students are suppressed. These are coded PS. -->
-<!-- * Medium sized groups are binned (e.g. "< 20%"). The binning method depends on the size of the group. See Table 2 for more details. -->
-```{r, eval = FALSE}
-get_documentation("EDFacts_acgr_sch_2011_2019")
-```
-
-<!-- Downloads the school district level version of the data -->
-<!-- Abbreviations Code List: FIPST = identifies the state, LEAID & LEANM identify the specific school district -->
-
-_Possible Graphics:_ state level graduation rates, graduation rates by school size
 
 ```{r}
 grad_rates <- get_data("EDFacts_acgr_lea_2011_2019")
 ```
 
-Downloads state names from Kieren Healy's data on GitHub
-Note the below code uses readr to read in the CSV, and the link is changed slightly so it says "raw" instead of "blob". This is a general method for reading in any CSV from GitHub.
-```{r}
-state_info <- readr::read_csv("https://github.com/kjhealy/fips-codes/raw/master/state_fips_master.csv")
-```
+Reusing the code from walkthrough here to clean grad-rates.
 
-<!-- Note that the FIPS is coded slightly differently in this file - it’s an integer. So to join these files need to first change "FIPST" so it is also an integer -->
-
-```{r}
-grad_rates <- grad_rates %>% 
-  mutate(fips = readr::parse_number(FIPST))
-```
-
-<!-- Joins FIPST to state name and abbreviation -->
-```{r}
-grad_rates <- left_join(grad_rates, state_info)
-```
-
-<!-- ALL_RATE is the graduation rate of all students who formed the adjusted cohort in school year 2018-19 -->
-
-_Possible Table:_ Can we make this a selectable table where you can group by state and it shows the aggregate rate?
-
-```{r}
-table <- grad_rates %>% 
-  select(state_name, ALL_RATE)
-head(table)
-```
-
-<!-- Downloads the lunch program data set -->
-<!-- Assuming TOTALREV = total revenue per school district (LEAID) -->
-
-```{r}
-fiscal_18 <- get_data("NCES_CCD_fiscal_district_2018")
-
-# select only the variables we want
-fiscal_18 <- fiscal_18 %>% 
-  select(FIPST, LEAID, TOTALREV)
-```
-
-<!-- There are negative values in the TOTALREV column, which appear to indicate total revenue is suppressed, and they are not covered in the documentation so removing them from data set while joining the lunch program data set to the grad_rates data set. -->
-```{r}
-grad_rates <- left_join(grad_rates, filter(fiscal_18, TOTALREV > 0))
-```
-
-**Scatterplot 1 - DNU**
-
-Hard to visualize due to the binning of the Cohort Graduation rate. Need to transform graduation rate to an approximately numeric scale by putting the rate in the middle of the range, if there is a range, and otherwise taking the exact percent.
-
-```{r}
-theme_set(theme_minimal(15))
-
-ggplot(grad_rates, aes(TOTALREV, ALL_RATE)) +
-  geom_point()
-```
-
-- Visualizing the graduation rate ranges in the ALL_RATE column
-
-<!-- Split the ALL_RATE column based on the "-" character. Get a warning because there are many cases where the range is not binned. -->
-
-<!-- Drops any cases that cannot easily be transformed to numeric (e.g., "GE50", "PS"), fills in the missing values with the lower value, and then calculates the mean. Note when calculate the mean need to do so rowwise(). -->
-
-Used count() above to basically verify that it was all working, but now need to do the same thing to actual dataframe.
 ```{r}
 grad_rates <- grad_rates %>% 
   tidyr::separate(ALL_RATE, c("lower", "upper"), sep = "-") %>% 
@@ -142,83 +75,6 @@ grad_rates <- grad_rates %>%
   ungroup()
 ```
 
-**Scatterplot 2 - DNU**
-
-There is a lot of data bunched up - need to try a log transformation of the x-axis.
-
-```{r}
-ggplot(grad_rates, aes(TOTALREV, mean)) +
-  geom_point()
-```
-**Scatterplot 3 - DNU**
-
-Uses log transformation
-
-```{r}
-ggplot(grad_rates, aes(TOTALREV, mean)) +
-  geom_point() +
-  scale_x_log10()
-```
-
-**Scatterplot 4 - DNU**
-
-Adds in x labels
-
-```{r}
-ggplot(grad_rates, aes(TOTALREV, mean)) +
-  geom_point() +
-  scale_x_log10(labels = scales::dollar)
-```
-
-**Scatterplot 5 - Great!**
-
-Style updates
-
-```{r}
-ggplot(grad_rates, aes(TOTALREV, mean)) +
-  geom_point(
-    stroke = 0,
-    alpha = 0.3,
-    color = "gray20",
-    size = 2
-  ) +
-  scale_x_log10("Total District Revenue", labels = scales::dollar) +
-  labs(
-    y = "Approximate average graduation rate",
-    title = stringr::str_wrap("School districts with higher total revenue generally have higher graduation rates", 60),
-    subtitle = "Each point represents a school district",
-    caption = "Note the log transformation of the x-axis"
-  ) +
-  theme(plot.title.position = "plot")
-```
-
-**Scatterplot 6 - Final**
-
-Groups graduation rate by state, but lacks the x-axis labels
-```{r}
-
-grad_rates %>% 
-  tidyr::drop_na(state_abbr) %>% 
-ggplot(aes(TOTALREV, mean)) +
-  geom_point(
-    stroke = 0,
-    alpha = 0.3,
-    color = "gray20",
-    size = 2
-  ) +
-  facet_geo(~state_abbr) +
-  scale_x_log10("Total District Revenue", labels = scales::dollar) +
-  labs(
-    y = "Approximate average graduation rate",
-    title = stringr::str_wrap("School districts with higher total revenue generally have higher graduation rates", 60),
-    subtitle = "Each point represents a school district",
-    caption = "Note the log transformation of the x-axis"
-  ) +
-  theme(
-    plot.title.position = "plot",
-    axis.text.x = element_blank()
-  )
-```
 
 **Descriptive Statistics**
 
@@ -277,12 +133,15 @@ stu.race
     - This git repo on [teacher diversity](https://github.com/WPMedia/teacher_diversity) This public GitHub provides teacher ethnicity by state and school district, which we might be able to join with the class data set. Data from 2017-2018 for most schools and for 2016-2017 for a few. Data on 6 states is not reported.
 - Covid data: stiff finding. Some options
     - This [paper](https://jsri.msu.edu/publications/nexo/vol/no-2-spring-2021/racial-ethnic-differences-in-education-disruptions-during-the-covid-19-pandemic) might provide a source.
+- Fiscal data for the most recent year (2018). 
 
 ### Identification of the intended audience for each visualization
 
-- We plan to make each/most visualizations for different audience, inclusing general (public), policy makers, and researchers
+- We plan to make each/most visualizations for different audience, including general (public), policy makers, and researchers. 
+- For general public and policy makers, we want to make easy to understand visuals and will have no to very few statistics. 
+- For researchers, we'd like to include those statistics as well as tables.
 
 ### The intended message to be communicated for each plot.
 - Differences in graduation rates for underrepresented student populations by various factors
 - Showcasing where inequity for students may be an issue
-- R3 to show how the fiscal year varies by students’ characteristics. 
+- R3 to show how the fiscal year varies by students’ characteristics. Do states perpetuate some systematic bias?
