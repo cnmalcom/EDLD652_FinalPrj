@@ -22,7 +22,7 @@ knitr::opts_chunk$set(warning = FALSE,
 ```
 
 ```{r Load package}
-pacman::p_load(edld652, tidyverse, geofacet, psych)
+pacman::p_load(edld652, tidyverse, geofacet, psych, rio, here, forcats)
 ```
 
 ### Research Questions
@@ -235,6 +235,38 @@ Descriptive statistics for the varable "mean", which is the mean graduation rate
 ggplot(grad_rates, aes(x = mean)) +
 geom_histogram()
 ```
+
+```{r}
+race <- import(here("data", "teacher_student_race_ethnicity.csv" )) %>% 
+  mutate(State = ST) %>%
+  select(-c(ST, totalS, totalT, ends_with("N"))) %>% 
+  pivot_longer(cols = ends_with("T"),
+               names_to = "teacher_race",
+               values_to = "pctracet") %>% 
+  pivot_longer(cols = ends_with("S"),
+               names_to = "student_race", 
+               values_to = "pctraces")
+
+race$teacher_race <-gsub("T","",as.character(race$teacher_race))
+race$student_race <-gsub("S","",as.character(race$student_race))
+
+teacher.race <- race %>% 
+  select(teacher_race, pctracet) %>% 
+  ggplot(aes(pctracet,fct_reorder(teacher_race, pctracet)))+
+  geom_col()
+teacher.race
+
+stu.race <- race %>% 
+  select(student_race, pctraces) %>% 
+  ggplot(aes(pctraces,student_race))+
+  geom_col()
+stu.race         
+         
+
+
+               
+```
+
 
 ### Names of the datasets you’re thinking of using and what keys you’ll need for joining the data
 
