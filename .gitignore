@@ -1,3 +1,11 @@
+#data documentation
+data-documentation/
+
+
+#mac file
+.DS_Store
+
+
 # History files
 .Rhistory
 .Rapp.history
