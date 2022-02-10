@@ -1,0 +1,49 @@
+---
+title: "EDLD 652 Final Project Draft"
+author: "Cassie Malcom"
+date: "2/10/2022"
+output: 
+  html_document:
+        toc: true
+        toc_float: true
+        highlight: kate
+        code_folding: hide
+---
+
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE,
+                      error = FALSE,
+                      fig.width = 9, 
+                      fig.height = 9)
+```
+
+```{r}
+library(pacman)
+# install.packages(arrow)
+```
+
+```{r}
+pacman::p_load(edld652, tidyverse, psych, rio, here, forcats, arrow)
+```
+
+```{r}
+list_datasets()
+```
+
+```{r}
+sch_char <- get_data("NCES_CCD_nonfiscal_school_2017_2020_school_characteristics")
+sch_char
+```
+
+```{r}
+fiscal_2018 <- get_data("NCES_CCD_fiscal_district_2018")
+fiscal_2018
+```
+
+```{r}
+dir21 <- get_data("NCES_CCD_nonfiscal_district_2017_2021_directory")
+dir21
+```
+
