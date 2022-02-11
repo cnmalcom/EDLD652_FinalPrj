@@ -18,9 +18,11 @@ pacman::p_load(edld652, tidyverse, psych, rio, here, forcats)
 
 ```{r load data}
 
+rla_sc <- get_data("EDFacts_rla_achievement_sch_2010_2019")
 fis08 <- import(here("Data","fis08.csv"))
 math_sc <- import(here("Data", "math_sc.csv"))
-rla_sc <- import(here("Data", "rla_sc.csv"))
+#rla_sc <- import(here("Data", "rla_sc.csv")) file is too big, I can't push it to github
+
 ```
 
 
