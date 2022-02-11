@@ -1,0 +1,88 @@
+---
+title: "Explore data"
+author: "Merly Klaas"
+date: "2/3/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+pacman::p_load(edld652, tidyverse, psych, rio, here, forcats, arrow, stringr)
+
+```
+
+```{r}
+pacman::p_load(edld652, tidyverse, psych, rio, here, forcats)
+```
+
+
+```{r load data}
+
+fis08 <- import(here("Data","fis08.csv"))
+math_sc <- import(here("Data", "math_sc.csv"))
+rla_sc <- import(here("Data", "rla_sc.csv"))
+```
+
+
+```{r select relevant variable}
+math_sc <- math_sc %>% 
+  select(LEAID, STNAM, NCESSCH, ALL_MTHHSPCTPROF) 
+rla_sc <- rla_sc %>% 
+   select(LEAID, STNAM, NCESSCH, ALL_RLAHSPCTPROF)
+fis08 <- fis08 %>% 
+  select(LEAID, STNAME,V93)
+```
+
+```{r}
+#Change LEAID and School ID in math dataset from interger to character for joining two datasets
+math_sc$LEAID <- as.character(math_sc$LEAID)
+math_sc$NCESSCH <- as.character(math_sc$NCESSCH)
+
+# Join math and rla
+# select the upper end of the interval in percentage of proficiency
+join <- left_join(rla_sc, math_sc, by = "NCESSCH") #%>% 
+  # sub('.+-(.+)', '\\1', ALL_MTHHSPCTPROF) %>% 
+  #  sub('.+-(.+)', '\\1', ALL_RLAHSPCTPROF)
+  
+join$ALL_RLAHSPCTPROF <- sub(".*-(.*)", "\\1", join$ALL_RLAHSPCTPROF) 
+join$ALL_MTHHSPCTPROF <- sub(".*-(.*)", "\\1", join$ALL_MTHHSPCTPROF) 
+
+#transform  proficiency variable from character to numeric 
+# This also coerced values starts with letter to be NA
+join$ALL_MTHHSPCTPROF <- as.numeric(join$ALL_MTHHSPCTPROF)
+join$ALL_RLAHSPCTPROF <- as.numeric(join$ALL_RLAHSPCTPROF)
+
+```
+
+
+```{r}
+
+#Rreplace all missing values with NA 
+join <- join %>% 
+  mutate(across(everything(), ~ifelse(.=="", NA, as.character(.)))) %>% 
+   mutate(across(where(is.character), ~na_if(., "n/a"))) 
+
+clean_join <- join %>% 
+  rename("LEAID" = LEAID.x)
+```
+
+Re-arrange column
+```{r}
+clean_join <- clean_join %>% 
+  select(LEAID, NCESSCH, ALL_RLAHSPCTPROF, ALL_MTHHSPCTPROF)
+
+```
+
+Join achievement with textbook spending by LEAID & Check the unique values in State column
+```{r}
+ full_join <- left_join(clean_join, fis08) %>% 
+   select(STNAME, LEAID, NCESSCH, ALL_RLAHSPCTPROF, ALL_MTHHSPCTPROF, V93) %>% 
+  drop_na(STNAME)
+unique(full_join$STNAME)
+
+# export(full_join, "full_join.csv") 
+```
+
+
+
+
