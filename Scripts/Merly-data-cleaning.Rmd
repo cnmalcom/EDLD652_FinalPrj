@@ -7,7 +7,8 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-pacman::p_load(edld652, tidyverse, psych, rio, here, forcats, arrow, stringr)
+pacman::p_load(edld652, tidyverse, psych, rio, here, forcats, arrow, stringr, janitor
+               )
 
 ```
 
@@ -18,9 +19,12 @@ pacman::p_load(edld652, tidyverse, psych, rio, here, forcats)
 
 ```{r load data}
 
-rla_sc <- get_data("EDFacts_rla_achievement_sch_2010_2019")
+#rla_sc <- get_data("EDFacts_rla_achievement_sch_2010_2019")
+rla_sc <- import(here("Data", "rla_sc.csv"))  #rla_sc file is included in gitignore. 
 fis08 <- import(here("Data","fis08.csv"))
 math_sc <- import(here("Data", "math_sc.csv"))
+#member_sc <- import(here("Data", "school-membership-17-21.parquet"))
+#member_ds <- import(here("Data", "district-membership-17-21.parquet"))
 #rla_sc <- import(here("Data", "rla_sc.csv")) file is too big, I can't push it to github
 
 ```
@@ -28,63 +32,99 @@ math_sc <- import(here("Data", "math_sc.csv"))
 
 ```{r select relevant variable}
 math_sc <- math_sc %>% 
-  select(LEAID, STNAM, NCESSCH, ALL_MTHHSPCTPROF) 
-rla_sc <- rla_sc %>% 
-   select(LEAID, STNAM, NCESSCH, ALL_RLAHSPCTPROF)
-fis08 <- fis08 %>% 
-  select(LEAID, STNAME,V93)
-```
+  select(LEAID, STNAM, NCESSCH, ALL_MTHHSPCTPROF, MAM_MTHHSPCTPROF, MAS_MTHHSPCTPROF, MBL_MTHHSPCTPROF, MHI_MTHHSPCTPROF, MTR_MTHHSPCTPROF, MWH_MTHHSPCTPROF, CWD_MTHHSPCTPROF, ECD_MTHHSPCTPROF, LEP_MTHHSPCTPROF,HOM_MTHHSPCTPROF)  %>% 
+  clean_names() %>% 
+  pivot_longer(cols= ends_with("prof"), 
+              names_to = "identity", 
+              values_to = "math_pctabove",
+              names_pattern = "(.*)_mthhspctprof")
 
-```{r}
-#Change LEAID and School ID in math dataset from interger to character for joining two datasets
-math_sc$LEAID <- as.character(math_sc$LEAID)
-math_sc$NCESSCH <- as.character(math_sc$NCESSCH)
-
-# Join math and rla
-# select the upper end of the interval in percentage of proficiency
-join <- left_join(rla_sc, math_sc, by = "NCESSCH") #%>% 
-  # sub('.+-(.+)', '\\1', ALL_MTHHSPCTPROF) %>% 
-  #  sub('.+-(.+)', '\\1', ALL_RLAHSPCTPROF)
+math_sc$math_pctabove <- sub(".*-(.*)", "\\1", math_sc$math_pctabove) 
+math_sc$math_pctabove <- as.numeric(math_sc$math_pctabove)
+math_sc$leaid <- as.character(math_sc$leaid)
+math_sc$ncessch <- as.character(math_sc$ncessch)
   
-join$ALL_RLAHSPCTPROF <- sub(".*-(.*)", "\\1", join$ALL_RLAHSPCTPROF) 
-join$ALL_MTHHSPCTPROF <- sub(".*-(.*)", "\\1", join$ALL_MTHHSPCTPROF) 
+  
+rla_sc <- rla_sc %>% 
+   select(LEAID, STNAM, NCESSCH, ALL_RLAHSPCTPROF, MAM_RLAHSPCTPROF, MAS_RLAHSPCTPROF, MBL_RLAHSPCTPROF, MHI_RLAHSPCTPROF, MTR_RLAHSPCTPROF, MWH_RLAHSPCTPROF, CWD_RLAHSPCTPROF, ECD_RLAHSPCTPROF, LEP_RLAHSPCTPROF, HOM_RLAHSPCTPROF)  %>%  
+  clean_names() %>% 
+  pivot_longer(cols= ends_with("prof"), 
+              names_to = "identity", 
+              values_to = "rla_pctabove",
+              names_pattern = "(.*)_rlahspctprof")
+rla_sc$rla_pctabove <- sub(".*-(.*)", "\\1", rla_sc$rla_pctabove) 
+rla_sc$rla_pctabove <- as.numeric(rla_sc$rla_pctabove)
 
-#transform  proficiency variable from character to numeric 
-# This also coerced values starts with letter to be NA
-join$ALL_MTHHSPCTPROF <- as.numeric(join$ALL_MTHHSPCTPROF)
-join$ALL_RLAHSPCTPROF <- as.numeric(join$ALL_RLAHSPCTPROF)
+
+
+
+
+fis08 <- fis08 %>% 
+  select(LEAID, STNAME, "textbook"= V93, TOTALEXP, "instruction"= TCURINST , "supservice" = TCURSSVC ) %>% 
+  clean_names()
 
 ```
 
+```{r join rla-math}
+all <- left_join(rla_sc, math_sc) %>% 
+  left_join(fis08) %>%
+  select(!stname)
 
+
+
+```
+
+```{r creating different plots}
+
+full_join %>% 
+  ggplot(aes())+  
+  geom_histogram() +
+  facet_wrap(~STNAME)
+
+full_join %>% 
+  ggplot(aes(ALL_MTHHSPCTPROF, V93))+  
+  geom_point(aes(color = ALL_MTHHSPCTPROF)) + 
+  gghighlight::gghighlight(ALL_MTHHSPCTPROF <= 50)
+
+
+full_join %>% 
+ggplot(aes(x= ALL_RLAHSPCTPROF, y= STNAME, fill =  V93)) + 
+  geom_tile()
+
+```
 ```{r}
+library(leaidr)
 
-#Rreplace all missing values with NA 
-join <- join %>% 
-  mutate(across(everything(), ~ifelse(.=="", NA, as.character(.)))) %>% 
-   mutate(across(where(is.character), ~na_if(., "n/a"))) 
+us <- lea_get()
 
-clean_join <- join %>% 
-  rename("LEAID" = LEAID.x)
+us <- us %>% 
+  sf::st_as_sf() 
+
+fips <- readr::read_csv("https://github.com/kjhealy/fips-codes/raw/master/state_fips_master.csv")
+
+states <- fips$state_name
+
+us %>% 
+  dplyr::rename(fips = STATEFP) %>% 
+  dplyr::mutate(fips = readr::parse_number(fips)) %>% 
+  dplyr::right_join(fips) %>% 
+  dplyr::filter(state_name %in% states[!states %in% c("Alaska", "Hawaii")]) %>% 
+  ggplot2::ggplot() +
+  ggplot2::geom_sf(size = 0.1)
+
+
+library(tmap)
+tmap_options(check.and.fix = TRUE)
+
+us %>% 
+  dplyr::rename(fips = STATEFP) %>% 
+  dplyr::mutate(fips = readr::parse_number(fips)) %>% 
+  dplyr::right_join(fips) %>% 
+  dplyr::filter(state_name %in% states[!states %in% c("Alaska", "Hawaii")]) %>% 
+  tm_shape() +
+  tm_sf()
+
 ```
-
-Re-arrange column
-```{r}
-clean_join <- clean_join %>% 
-  select(LEAID, NCESSCH, ALL_RLAHSPCTPROF, ALL_MTHHSPCTPROF)
-
-```
-
-Join achievement with textbook spending by LEAID & Check the unique values in State column
-```{r}
- full_join <- left_join(clean_join, fis08) %>% 
-   select(STNAME, LEAID, NCESSCH, ALL_RLAHSPCTPROF, ALL_MTHHSPCTPROF, V93) %>% 
-  drop_na(STNAME)
-unique(full_join$STNAME)
-
-# export(full_join, "full_join.csv") 
-```
-
 
 
 
