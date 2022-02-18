@@ -1,0 +1,75 @@
+---
+title: "Textbooks"
+author: "Cassie Malcom"
+date: "2/17/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(pacman)
+install.packages(arrow)
+```
+
+```{r}
+pacman::p_load(edld652, tidyverse, psych, rio, here, forcats, arrow, dplyr, stringr, readr)
+```
+
+```{r}
+ethnic <- get_data("NCES_CCD_nonfiscal_school_2019_membership")
+
+ethnic
+```
+
+```{r}
+e2 <- ethnic %>%
+  filter(!is.na(STUDENT_COUNT))
+
+e2
+```
+
+```{r}
+e3 <- e2 %>%
+  filter((GRADE=="Grade 9")|(GRADE=="Grade 10")|(GRADE=="Grade 11")|(GRADE=="Grade 12")|(str_detect(SCH_NAME, "High")))
+
+e3
+```
+
+```{r}
+colnames(e3)
+```
+
+```{r}
+e4 <- e3 %>%
+  select(LEAID, GRADE, SCH_NAME, SCHOOL_YEAR, RACE_ETHNICITY, SEX, STUDENT_COUNT, ST)
+
+e4
+```
+
+```{r}
+e5 <- e4 %>%
+  group_by(LEAID, RACE_ETHNICITY) %>%
+  summarize(student = sum(STUDENT_COUNT))
+
+e5
+```
+Filter out the "no category codes" and "not specified", "two or more races"
+```{r}
+e6 <- e5 %>%
+  filter(RACE_ETHNICITY!="Not Specified" & RACE_ETHNICITY!="No Category Codes" & RACE_ETHNICITY!="Two or more races")
+
+e6
+```
+
+```{r}
+write.csv(e6, "ethnicity.csv")
+```
+
+```{r}
+
+```
+
+
