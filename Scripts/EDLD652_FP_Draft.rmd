@@ -1,7 +1,10 @@
 ---
 title: "EDLD 652 Final Project Draft"
-author: "Cassie Malcom"
-date: "2/10/2022"
+author: 
+    - Cassie Malcom
+    - Merly Klaas
+    - Havi Khurana
+date: "2/21/2022"
 output: 
   html_document:
         toc: true
@@ -19,31 +22,93 @@ knitr::opts_chunk$set(echo = TRUE,
                       fig.height = 9)
 ```
 
-```{r}
-library(pacman)
-# install.packages(arrow)
+```{r load packages}
+pacman::p_load("tidyverse","rio","here","janitor", "usmap","maps", "colorspace","geofacet", "viridis","ggthemes","arrow", "forcats")
 ```
 
-```{r}
-pacman::p_load(edld652, tidyverse, psych, rio, here, forcats, arrow)
-```
+## RQ1
 
-```{r}
-list_datasets()
-```
+**Student and Teacher ethnic distribution in K-12 public schools in the US**
 
-```{r}
-sch_char <- get_data("NCES_CCD_nonfiscal_school_2017_2020_school_characteristics")
-sch_char
-```
+```{r rq1-subset-data, eval = FALSE}
+#We used "district-membership-17-21.parquet" file. Being too big, we created a subset of this data and stored it our local. Yet, this is how we cleaned the data
+dm <- read_parquet(here("district-membership-17-21.parquet"))
 
-```{r}
-fiscal_2018 <- get_data("NCES_CCD_fiscal_district_2018")
-fiscal_2018
-```
+dm_s <- dm %>% 
+  select(GRADE,LEAID,LEA_NAME,RACE_ETHNICITY,
+         SCHOOL_YEAR,SEX,ST,STATENAME, STUDENT_COUNT, YEAR) %>% 
+  filter(YEAR %in% c("2017","2018"))
+rm(dm) #freeing space
 
-```{r}
-dir21 <- get_data("NCES_CCD_nonfiscal_district_2017_2021_directory")
-dir21
+unique(dm_s$GRADE)
+#"Grade 6"           "Grade 7"           "Grade 8"          
+#[4] "Grade 9"           "Kindergarten"      "Not Specified"    
+#[7] "Pre-Kindergarten"  "Ungraded"          "No Category Codes"
+#[10] "Grade 1"           "Grade 10"          "Grade 11"         
+#[13] "Grade 12"          "Grade 2"           "Grade 3"          
+#[16] "Grade 4"           "Grade 5"           "Adult Education"  
+#[19] "Grade 13"  
+
+#I'm making two subsets here. One which has only K12 student distribution by race and ethnincity, and another, which has the total number of students in the district (this is required for the next research question)
+
+#Student data for K12
+
+#Let's remove the other grade classes.
+
+dm_k12 <- subset(dm_s, grepl(("^G|^K"), GRADE))
+
+unique(dm_k12$GRADE) #We still have Grade 13, let's remove that
+
+dm_k12 <- dm_k12 %>% 
+    filter(GRADE != "Grade 13")
+
+export(dm_k12, "dm_k12.rda")
+
+# Total students in district
+
+#"No Category Codes" is in the GRADE, RACE/ETHNICITY, and SEX categories. 
+#This comprises the sum of all the other groups at the category level. 
+#We checked this compaing the two values; it almost all cases this was equal. (for 3 million) 
+#In a handful of cases (<50), this was not equal when no grade-wise student ethnincity data was available.
+#We also want total students enrolled for each district irrespective of the grades. 
+#This information is coded in grade == "no category codes", race/ethnicity == "no category codes", and sex == "no category codes".
+
+dm_total <- dm_s %>% 
+  filter(YEAR == "2018",
+         GRADE == "No Category Codes",
+         RACE_ETHNICITY == "No Category Codes",
+         SEX == "No Category Codes") 
+
+#weird that each district is occuring two times. let's just keep one.
+
+dm_total <- dm_total %>% 
+  distinct()
+
+length(unique(dm_total$LEAID)) #this doesn't match our dm_total dimensions. 
+
+dm_total <- dm_total %>% 
+  distinct() %>% 
+  group_by(LEAID) %>% 
+  mutate(n=n()) #some districts have two rows
+ 
+#Some districts (44) have double reporting. 
+#Mostly in DC: On checking, one number points to 0 and another to a finite value. 
+#In all other cases (NV, OR, VT), both rows have very close values.
+#Let's keep the higher of the two.
+
+temp <- dm_total %>%
+  filter(n ==2) %>% 
+  slice(which.max(STUDENT_COUNT))
+
+#Let's join them
+
+dm_total <- dm_total %>% 
+  filter(n == 1) %>% 
+  rbind(temp)
+  
+#Now each district has a unique row, and there are no inconsistencies.
+
+#export it
+export(dm_total, "dm_total.rda")
 ```
 
