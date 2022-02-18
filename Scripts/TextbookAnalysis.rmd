@@ -15,7 +15,7 @@ library(pacman)
 ```
 
 ```{r}
-pacman::p_load(edld652, tidyverse, psych, rio, here, forcats, arrow, dplyr, stringr, readr)
+pacman::p_load(edld652, tidyverse, psych, rio, here, forcats, arrow, dplyr, stringr, readr, tidyr)
 ```
 
 ```{r}
@@ -92,7 +92,13 @@ ed3
 Need to get all minorities into one sum. Pivot?
 ```{r}
 ed4 <- ed3 %>%
-  filter(RACE_ETHNICITY!="White")
+  pivot_wider(names_from = RACE_ETHNICITY, values_from = student)
+
+ed4
+```
+
+```{r}
+ed4$minority <- rowSums(ed4[ , c(3,4,5,6,7)], na.rm=TRUE)
 
 ed4
 ```
