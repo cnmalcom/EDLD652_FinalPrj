@@ -24,7 +24,7 @@ knitr::opts_chunk$set(echo = TRUE,
 ```
 
 ```{r load packages}
-pacman::p_load("tidyverse","rio","here","janitor", "usmap","maps", "colorspace","geofacet", "viridis","ggthemes","arrow", "forcats")
+pacman::p_load("tidyverse","rio","here","janitor", "usmap","maps", "colorspace","geofacet", "viridis","ggthemes","arrow", "forcats", "ggrepel")
 ```
 
 ## RQ1
@@ -487,7 +487,11 @@ all %>%
   ggplot()+
   geom_col(aes(meanrla, stnam), fill = "#EEC77E")+
   scale_x_continuous(expand = c(0,0), 
-                     limits = c(0,100))
+                     limits = c(0,100))+ 
+  labs(title = "Percentage of students at and above RLA proficiency across states",
+       subtitle = "All High School Students Category",
+         y = "",
+       x= "Percent of students at and above RLA proficiency")
                  
   
 #proficiency level for children with disability
@@ -499,7 +503,11 @@ all %>%
   ggplot()+
   geom_col(aes(meanrla, stnam), fill = "#A1D2F1")+
   scale_x_continuous(expand = c(0,0), 
-                     limits = c(0,100))
+                     limits = c(0,100))+
+    labs(title = "Percentage of students at and above RLA proficiency across states",
+       subtitle = "Students with disabililty category",
+         y = "",
+       x= "Percent of students at and above RLA proficiency")
 
 
 #proficiency level for Economically disadvantaged students
@@ -511,12 +519,71 @@ all %>%
   ggplot()+
   geom_col(aes(meanrla, stnam), fill = "#F1A8A1")+
   scale_x_continuous(expand = c(0,0), 
-                     limits = c(0,100))
+                     limits = c(0,100)) +
+  labs(title = "Percentage of High School students at and above RLA proficiency across states",
+       subtitle = "Low-Income Students Category",
+         y = "",
+       x= "Percent of students at and above RLA proficiency")
 
 
 ```
 
 ### 2b. What is the relationship between district spending on textbook and students proficiency level? 
+```{r}
+#State level data
+state_textbook <- all %>%
+  select(stnam, textbook, student_count) %>% 
+  distinct(stnam, textbook, student_count) %>% 
+  drop_na() %>% 
+  group_by(stnam) %>% 
+  summarise(state_per_student = sum(textbook)/sum(student_count)) 
+
+
+state_pct<- all %>% 
+  filter(identity == "all") %>% 
+  group_by(stnam) %>% 
+  summarise(meanmath = mean(math_pctabove, na.rm = TRUE), 
+            meanrla = mean(rla_pctabove, na.rm=TRUE))
+
+state_joined<-left_join(state_textbook, state_pct)
+```
+
+
+```{r}
+state_textbook  %>% 
+  ggplot()+
+  geom_col(aes(state_per_student, fct_reorder(stnam, state_per_student)), fill = "#A1D2F1")+
+  scale_x_continuous(expand = c(0,0), 
+                     limits = c(0,110)) +
+  labs( x = "Textbook spending per student")
+
+state_joined%>% 
+  filter(!state_per_student <0,
+         !stnam == "North Dakota",
+         !stnam == "Alaska") %>% #drop state with missing values
+  ggplot(aes(state_per_student, meanmath))+
+  geom_point() +
+  geom_smooth(method = "lm")+
+  geom_text_repel(aes(label = stnam))+
+  scale_x_continuous(expand = c(0,0)) +
+  labs(title= "Textbook Spending & RLA Achievement",
+      x = "Textbook spending per student", 
+       y = "Percent of Students at Proficiency Level")
+
+
+state_joined%>% 
+  filter(!state_per_student <0,
+         !stnam == "North Dakota",
+         !stnam == "Alaska") %>% #drop state with missing values
+  ggplot(aes(state_per_student, meanmath))+
+  geom_point() +
+  geom_smooth(method = "lm")+
+  geom_text_repel(aes(label = stnam))+
+  scale_x_continuous(expand = c(0,0)) +
+    labs(title= "Textbook Spending & Math Achievement",
+      x = "Textbook spending per student", 
+       y = "Percent of Students at Proficiency Level")
+```
 
 
 ```{r}
@@ -528,7 +595,6 @@ cek <- all %>%
          low = ifelse(meanrla<=70.38, TRUE, FALSE)) %>% 
   ggplot(aes(meanrla, stnam)) +
   geom_point(aes(size = perstudbook, color = low))+
-  geom_smooth(method = "lm", se = FALSE) + 
   geom_vline(xintercept=70.38, 
              linetype = "dashed", 
              color = "gray",
