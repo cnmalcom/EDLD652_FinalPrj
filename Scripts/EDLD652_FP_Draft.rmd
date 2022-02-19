@@ -389,14 +389,6 @@ ggplot(data = stueth_map,
 
 
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-pacman::p_load(edld652, tidyverse, psych, rio, here, forcats, arrow, stringr, janitor, leaidr, ggplot2, colorspace)
-
-```
-
-
-
 ```{r load data}
 
 #rla_sc <- get_data("EDFacts_rla_achievement_sch_2010_2019")
@@ -603,7 +595,7 @@ cek <- all %>%
            y = "Virginia" ,label = "National \nAverage",color = "gray30",size = 3, 
            family="Courier", line = "gray", fontface="bold") +
   labs(title = "Relationship between Textbook Spending per Student and Language proficiency", 
-       x= "Percent of students at and above proficience level",
+       x= "Percent of students at and above proficiency level",
        y="",
        size= "Spending on textbook per student",
        color="",
