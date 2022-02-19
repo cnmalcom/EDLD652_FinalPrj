@@ -382,3 +382,288 @@ ggplot(data = stueth_map,
     theme(strip.background = element_blank(),
           legend.direction = "vertical") 
 ```
+
+
+## Research Question 2
+### 2a.  How does the the proficiently level in language and math vary across state for High School Students? How does it differ by students characteristics such as race/ethnicity, English Learner status, Student with Disability, Low Income students?
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+pacman::p_load(edld652, tidyverse, psych, rio, here, forcats, arrow, stringr, janitor, leaidr, ggplot2, colorspace)
+
+```
+
+
+
+```{r load data}
+
+#rla_sc <- get_data("EDFacts_rla_achievement_sch_2010_2019")
+rla_sc <- import(here("Data", "rla_sc.csv"))  #rla_sc file is included in gitignore. 
+fis08 <- import(here("Data","fis08.csv"))
+math_sc <- import(here("Data", "math_sc.csv"))
+enroll <- import(here("Data", "dm_total.rda"))
+#member_sc <- import(here("Data", "school-membership-17-21.parquet"))
+#member_ds <- import(here("Data", "district-membership-17-21.parquet"))
+#rla_sc <- import(here("Data", "rla_sc.csv")) file is too big, I can't push it to github
+
+```
+
+
+```{r select relevant variable}
+math_sc <- math_sc %>% 
+  select(LEAID, STNAM, NCESSCH, ALL_MTHHSPCTPROF, MAM_MTHHSPCTPROF, MAS_MTHHSPCTPROF, MBL_MTHHSPCTPROF, MHI_MTHHSPCTPROF, MTR_MTHHSPCTPROF, MWH_MTHHSPCTPROF, CWD_MTHHSPCTPROF, ECD_MTHHSPCTPROF, LEP_MTHHSPCTPROF,HOM_MTHHSPCTPROF)  %>% 
+  clean_names() %>% 
+  pivot_longer(cols= ends_with("prof"), 
+              names_to = "identity", 
+              values_to = "math_pctabove",
+              names_pattern = "(.*)_mthhspctprof")
+
+math_sc$math_pctabove <- sub(".*-(.*)", "\\1", math_sc$math_pctabove) 
+math_sc$math_pctabove <- as.numeric(math_sc$math_pctabove)
+math_sc$leaid <- as.character(math_sc$leaid)
+math_sc$ncessch <- as.character(math_sc$ncessch)
+  
+  
+rla_sc <- rla_sc %>% 
+   select(LEAID,STNAM, NCESSCH, ALL_RLAHSPCTPROF, MAM_RLAHSPCTPROF, MAS_RLAHSPCTPROF, MBL_RLAHSPCTPROF, MHI_RLAHSPCTPROF, MTR_RLAHSPCTPROF, MWH_RLAHSPCTPROF, CWD_RLAHSPCTPROF, ECD_RLAHSPCTPROF, LEP_RLAHSPCTPROF, HOM_RLAHSPCTPROF)  %>%  
+  clean_names() %>% 
+  pivot_longer(cols= ends_with("prof"), 
+              names_to = "identity", 
+              values_to = "rla_pctabove",
+              names_pattern = "(.*)_rlahspctprof")
+rla_sc$rla_pctabove <- sub(".*-(.*)", "\\1", rla_sc$rla_pctabove) 
+rla_sc$rla_pctabove <- as.numeric(rla_sc$rla_pctabove)
+
+
+fis08 <- fis08 %>% 
+  select(LEAID, "textbook"= V93, TOTALEXP, "instruction"= TCURINST , "supservice" = TCURSSVC ) %>% 
+  clean_names()
+
+
+```
+
+```{r join rla-math}
+all <- left_join(rla_sc, math_sc) %>% 
+  left_join(fis08) 
+
+enroll <- enroll %>% 
+  select(LEAID, LEA_NAME, STUDENT_COUNT)%>% 
+  clean_names() 
+
+
+
+all<- left_join(all,enroll) %>% 
+  mutate(perstudbook = (textbook/student_count),
+         stnam = stringr::str_to_title(stnam)) %>% 
+  filter_all(all_vars(!is.infinite(.))) %>% 
+  filter(!stnam == "Stnam")
+
+
+```
+
+Plots to compare students proficiency level across states and how it differs based on students' characteristics. 
+
+```{r plots}
+#Planning to have interactive plots with all student as gray background and other characteristics with color on top of the gray bar. 
+#all students 
+all %>% 
+  filter(identity == "all") %>% 
+  group_by(stnam) %>% 
+  summarise(meanmath = mean(math_pctabove, na.rm = TRUE), 
+            meanrla = mean(rla_pctabove, na.rm=TRUE)) %>% 
+    ggplot()+
+   geom_col(aes(meanrla, fct_reorder(stnam, meanrla)), fill = "grey80") + 
+    scale_x_continuous(expand = c(0,0),
+                        limits = c(0,100) )
+
+#proficiency level for english language learner
+all %>% 
+  filter(identity == "lep") %>%
+  group_by(stnam) %>% 
+  summarise(meanmath = mean(math_pctabove, na.rm = TRUE), 
+            meanrla = mean(rla_pctabove, na.rm=TRUE)) %>% 
+  ggplot()+
+  geom_col(aes(meanrla, stnam), fill = "#EEC77E")+
+  scale_x_continuous(expand = c(0,0), 
+                     limits = c(0,100))
+                 
+  
+#proficiency level for children with disability
+all %>% 
+  filter(identity == "cwd") %>% 
+  group_by(stnam) %>% 
+  summarise(meanmath = mean(math_pctabove, na.rm = TRUE), 
+            meanrla = mean(rla_pctabove, na.rm=TRUE)) %>% 
+  ggplot()+
+  geom_col(aes(meanrla, stnam), fill = "#A1D2F1")+
+  scale_x_continuous(expand = c(0,0), 
+                     limits = c(0,100))
+
+
+#proficiency level for Economically disadvantaged students
+all %>% 
+  filter(identity == "ecd") %>% 
+  group_by(stnam) %>% 
+  summarise(meanmath = mean(math_pctabove, na.rm = TRUE), 
+            meanrla = mean(rla_pctabove, na.rm=TRUE)) %>% 
+  ggplot()+
+  geom_col(aes(meanrla, stnam), fill = "#F1A8A1")+
+  scale_x_continuous(expand = c(0,0), 
+                     limits = c(0,100))
+
+
+```
+
+### 2b. What is the relationship between district spending on textbook and students proficiency level? 
+
+
+```{r}
+cek <- all %>% 
+  filter(identity == "all") %>% 
+  group_by(stnam) %>% 
+  mutate(meanmath = mean(math_pctabove, na.rm = TRUE), 
+            meanrla = mean(rla_pctabove, na.rm=TRUE),
+         low = ifelse(meanrla<=70.38, TRUE, FALSE)) %>% 
+  ggplot(aes(meanrla, stnam)) +
+  geom_point(aes(size = perstudbook, color = low))+
+  geom_smooth(method = "lm", se = FALSE) + 
+  geom_vline(xintercept=70.38, 
+             linetype = "dashed", 
+             color = "gray",
+             size = 1) +
+   annotate("text",x=67 ,
+           y = "Virginia" ,label = "National \nAverage",color = "gray30",size = 3, 
+           family="Courier", line = "gray", fontface="bold") +
+  labs(title = "Relationship between Textbook Spending per Student and Language proficiency", 
+       x= "Percent of students at and above proficience level",
+       y="",
+       size= "Spending on textbook per student",
+       color="",
+       legend= "") +
+   theme(legend.position = "bottom",
+        legend.direction = "horizontal",
+        legend.key.size = unit(1, 'cm'),
+        legend.key.height = unit(.5,"cm"), 
+        plot.title = element_text(hjust = 0),
+        plot.title.position = "plot")
+
+cek  
+
+```
+
+```{r}
+#Check the state with the highest proficiency level: Virginia 
+textbook_va <- all %>% 
+  filter(stnam == "Virginia")
+  
+
+va <- lea_get(state = "va") %>% 
+    sf::st_as_sf() 
+
+va_book <- left_join(va, textbook_va,by = c("GEOID" = "leaid")) %>% 
+  ggplot() +
+  geom_sf(aes(fill = perstudbook), size = 0.1) +
+  scale_fill_continuous_divergingx(palette = "Earth",  labels = scales::dollar) +
+  theme(legend.position = "bottom",
+        legend.direction = "horizontal",
+        legend.key.size = unit(1, 'cm'),
+        legend.key.height = unit(.5,"cm")) +
+  labs(fill = "Textbook funding per student")
+
+va_book
+```
+
+
+```{r}
+#Check the state with the lowest proficiency level: West Virginia 
+textbook_wv <- all %>% 
+  filter(stnam == "West Virginia")
+  
+
+wv <- lea_get(state = "wv") %>% 
+    sf::st_as_sf() 
+
+wv_book <- left_join(wv, textbook_wv,by = c("GEOID" = "leaid")) %>% 
+  ggplot() +
+  geom_sf(aes(fill = perstudbook), size = 0.1) +
+  scale_fill_continuous_divergingx(palette = "Earth",  labels = scales::dollar) +
+  theme(legend.position = "bottom",
+        legend.direction = "horizontal",
+        legend.key.size = unit(1, 'cm'),
+        legend.key.height = unit(.5,"cm")) +
+  labs(fill = "Textbook funding per student")
+
+wv_book
+
+```
+
+
+
+
+Visualizing textbook spending for school district in Oregon as an example: 
+```{r oregon-textbookplot}
+#  Oregon 
+textbook_or <- all %>% 
+  filter(stnam == "Oregon")
+  
+
+or <- lea_get(state = "or") %>% 
+    sf::st_as_sf() 
+
+or_book <- left_join(or, textbook_or,by = c("GEOID" = "leaid")) %>% 
+  ggplot() +
+  geom_sf(aes(fill = perstudbook), size = 0.1) +
+  scale_fill_continuous_divergingx(palette = "Earth",  labels = scales::dollar) +
+  theme(legend.position = "bottom",
+        legend.direction = "horizontal",
+        legend.key.size = unit(1, 'cm'),
+        legend.key.height = unit(.5,"cm")) +
+  labs(fill = "Textbook funding per student")
+
+or_book
+```
+
+
+
+```{r creating us plot, eval=FALSE, include=FALSE}
+# Spending on textbook perstudent across states
+#it takes too long to run - 
+
+
+us <- lea_get() %>% 
+    sf::st_as_sf() 
+
+fips <- readr::read_csv("https://github.com/kjhealy/fips-codes/raw/master/state_fips_master.csv")
+
+states <- fips$state_name
+
+us %>% 
+  dplyr::rename(fips = STATEFP,
+                leaid = GEOID) %>% 
+  dplyr::mutate(fips = readr::parse_number(fips)) %>% 
+  dplyr::right_join(fips) %>% 
+  right_join(all) %>% 
+  dplyr::filter(state_name %in% states[!states %in% c("Alaska", "Hawaii")]) %>% 
+  ggplot2::ggplot() +
+  geom_sf(aes(fill = perstudbook ), size = 0.1) +
+  scale_fill_continuous_divergingx(palette = "Earth",  labels = scales::dollar) +
+  theme(legend.position = "bottom",
+        legend.direction = "horizontal",
+        legend.key.size = unit(1, 'cm'),
+        legend.key.height = unit(.5,"cm")) +
+  labs(fill = "Textbook funding per student")
+
+
+
+```
+
+
+
+
+
+
+
+
+
