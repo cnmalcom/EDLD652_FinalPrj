@@ -9,6 +9,7 @@ output:
   html_document:
         toc: true
         toc_float: true
+        toc_depth: 4
         highlight: kate
         code_folding: hide
 ---
@@ -37,7 +38,7 @@ dm <- read_parquet(here("district-membership-17-21.parquet"))
 dm_s <- dm %>% 
   select(GRADE,LEAID,LEA_NAME,RACE_ETHNICITY,
          SCHOOL_YEAR,SEX,ST,STATENAME, STUDENT_COUNT, YEAR) %>% 
-  filter(YEAR %in% c("2017","2018"))
+  filter(YEAR %in% c("2017","2018")) #some teacher-ethnicity data is for year 2017
 rm(dm) #freeing space
 
 unique(dm_s$GRADE)
@@ -62,7 +63,7 @@ unique(dm_k12$GRADE) #We still have Grade 13, let's remove that
 dm_k12 <- dm_k12 %>% 
     filter(GRADE != "Grade 13")
 
-export(dm_k12, "dm_k12.rda")
+export(dm_k12, here("data", "dm_k12.rda"))
 
 # Total students in district
 
@@ -109,6 +110,275 @@ dm_total <- dm_total %>%
 #Now each district has a unique row, and there are no inconsistencies.
 
 #export it
-export(dm_total, "dm_total.rda")
+export(dm_total, here("data","dm_total.rda"))
 ```
 
+```{r read-data-rq1}
+dm_k12 <- import(here("data","dm_k12.rda")) %>% 
+    clean_names()
+```
+
+
+```{r summary}
+#Let's pool student population by grades and gender into a single ethnic categories district membership summary
+
+dm_sum <- dm_k12 %>% 
+    group_by(st, leaid, race_ethnicity, year, statename) %>% 
+    summarise(
+        student = sum(student_count, na.rm = TRUE) #students belonging to one race 
+    ) %>% 
+    group_by(st, leaid, year) %>% 
+    mutate(
+        total = sum(student, na.rm = TRUE),
+        no_code = sum(if_else(race_ethnicity == "No Category Codes", student, 0)),
+        total_reported = total - no_code,
+        flag = ifelse(no_code == total_reported, TRUE, FALSE)
+    )
+
+```
+
+
+
+```{r flag_f, eval = FALSE}
+#quick check   
+dm_sum %>% 
+   group_by(flag) %>% 
+  summarise(
+      n = n()
+   )
+
+#315612 times no_code = total_reported. Only 45 times this is not the case.
+#This doesn't seem like a coincidence. It feels like students were double counted 
+#If this is true, total_reported would be the correct number of total students. 
+
+#Let's explore the FALSE situations
+flag_f <- dm_sum %>% 
+    filter(flag == FALSE)
+
+#this only happens in 5 districts (3 CA, 2 KS) for 2018 year where student by ethnicity data is not present
+#i.e., students in each sub-group is 0.
+
+#Next, let's exclude these false situations, and find percentage of each ethnic group for 2018 and leaid
+```
+
+
+```{r dm_2018}
+dm18_long <- dm_sum %>% 
+    filter(year == "2018" & flag != "FALSE" & !race_ethnicity %in% c("No Category Codes", "Not Specified")) %>% 
+    mutate(
+        percent_d = round((student/total_reported)*100, 3)
+    ) %>% 
+    select(leaid, race_ethnicity, student, percent_d, total_reported, everything())
+
+#data in wide format
+dm18_wide <- dm18_long %>% 
+    pivot_wider(
+        names_from = race_ethnicity,
+        values_from = c(student,percent_d)
+    )
+
+#rm(dm_k12,dm_sum)
+```
+
+### Prelim plots
+
+#### Plot 1: Faceted Bar Charts
+
+```{r plot_raw, fig.height= 10, fig.width= 10}
+dm18_long %>% 
+    group_by(st, race_ethnicity) %>% 
+    summarise(
+        stu_total = sum(student)
+    ) %>% 
+    ggplot(aes(x = race_ethnicity, y = stu_total))+
+    geom_col()+
+    coord_flip()+
+    facet_wrap(~st)
+
+#Some variation is seem, but most numbers are collapsed due to common x-axis.
+#trying log transformation and percentage
+```
+
+```{r plot_log, fig.height= 10, fig.width= 10}
+dm18_long %>% 
+    group_by(st, race_ethnicity) %>% 
+    summarise(
+        stu_total = sum(student)
+    ) %>% 
+    ggplot(aes(x = race_ethnicity, y = stu_total))+
+    geom_col()+
+    scale_y_log10()+
+    coord_flip()+
+    facet_wrap(~st)
+#Some variation, but still hard to make much sense due to log scale
+```
+
+```{r plot_percentage, fig.height= 10, fig.width= 10}
+dm18_long %>% 
+    group_by(st, race_ethnicity) %>% 
+    summarise(
+        stu_total = sum(student)
+    ) %>% 
+    group_by(st) %>% 
+    mutate(
+        total = sum(stu_total),
+        percent_s = round((stu_total*100/total),3)
+    ) %>% 
+    ggplot(aes(x = race_ethnicity, y = percent_s))+
+    geom_col()+
+    coord_flip()+
+    facet_wrap(~st)
+
+#this turned out well. 
+
+```
+
+#### Plot 2: Bar charts with different layout 
+
+
+```{r plot_geofacet, fig.height= 10, fig.width= 12}
+dm18_long %>% 
+    group_by(st, race_ethnicity) %>% 
+    summarise(
+        stu_total = sum(student)
+    ) %>% 
+    group_by(st) %>% 
+    mutate(
+        total = sum(stu_total),
+        percent_s = round((stu_total*100/total),3)
+    ) %>% 
+    ggplot(aes(x = race_ethnicity, 
+               y = percent_s, 
+               fill = race_ethnicity))+
+    geom_col(show.legend = FALSE)+
+    coord_flip()+
+    theme_bw() +
+    facet_geo(~ st, grid = "us_state_grid2")
+
+```
+
+#### Plot 3: Maps
+
+```{r prep_map_data}
+#Prep data for state (still can't figure out district mapping) in pivot_wider format
+
+sm_2018 <- dm18_long %>% 
+    group_by(st, statename, race_ethnicity) %>% 
+    summarise(
+        stu_total = sum(student)
+    ) %>% 
+    group_by(st) %>% 
+    mutate(
+        total = sum(stu_total),
+        percent_s = round((stu_total*100/total),3),
+        state = tolower(statename)
+    ) %>% 
+    pivot_wider(
+        names_from = race_ethnicity,
+        values_from = c(stu_total,percent_s)
+    ) 
+
+#check <- left_join(statepop, sm_2018, by = c("abbr" = "st")) %>% 
+ #   select(-pop_2015)
+```
+
+#### Plot 3: Geographic maps for student ethnic percentage
+
+```{r state_maps}
+race <- c("percent_s_White","percent_s_Black or African American", "percent_s_American Indian or Alaska Native","percent_s_Asian","percent_s_Hispanic/Latino","percent_s_Native Hawaiian or Other Pacific Islander")
+
+plots <- vector("list", length(race))
+
+
+for (i in seq_along(race)) {
+plots[[i]] <- plot_usmap(data = sm_2018, values = race[i], color = "gray")+
+    scale_fill_continuous_sequential(palette = "Red-Purple") +
+    labs(
+        title = paste0("Distribution of ", race[i]," students")
+        )
+print(plots[[i]])
+}
+```
+
+
+```{r plot_together}
+us_states <- map_data("state")
+
+sm18_long <- dm18_long %>% 
+    group_by(st, statename, race_ethnicity) %>% 
+    summarise(
+        stu_total = sum(student)
+    ) %>% 
+    group_by(st) %>% 
+    mutate(
+        total = sum(stu_total),
+        percent_s = round((stu_total*100/total),3)
+    ) %>%  
+    filter(!st %in% c("BI","AS","GU","PR","VI"))
+
+sm18_long$region <- tolower(sm18_long$statename)
+stueth_map <- left_join(us_states, sm18_long)
+
+ggplot(data = stueth_map,
+             mapping = aes(x = long, y = lat,
+                 group = group,
+                 fill = percent_s))+ 
+    geom_polygon(color = "gray90", size = 0.05) +
+    coord_map(projection = "albers", lat0 = 39, lat1 = 45) +
+    scale_fill_continuous_sequential(palette = "Reds 3") +
+    theme_map() + facet_wrap(~ race_ethnicity, ncol = 3) +
+    theme(legend.position = "bottom",
+          strip.background = element_blank()) 
+```
+
+```{r plot_together_2}
+ggplot(data = subset(stueth_map, race_ethnicity != "White"),
+             mapping = aes(x = long, y = lat,
+                 group = group,
+                 fill = percent_s))+
+    geom_polygon(color = "gray90", size = 0.05) +
+    coord_map(projection = "albers", lat0 = 39, lat1 = 45) +
+    scale_fill_viridis_c(option = "magma")+
+    theme_map() + facet_wrap(~ race_ethnicity, ncol = 3) +
+    theme(legend.position = "bottom",
+          strip.background = element_blank()) 
+```
+
+
+```{r plot_together_3}
+sm18_long %>% 
+    mutate(
+        rbinary = ifelse(race_ethnicity == "White", "White","Students of Color")
+    ) %>%
+    group_by(region, rbinary) %>% 
+    summarise(
+        percent_b = sum(percent_s)
+    ) %>% 
+    right_join(us_states) %>% 
+    ggplot(mapping = aes(x = long, y = lat,
+                 group = group,
+                 fill = percent_b))+
+    geom_polygon(color = "gray90", size = 0.05) +
+    coord_map(projection = "albers", lat0 = 39, lat1 = 45)+
+    scale_fill_viridis_c(option = "magma")+
+    theme_map() + facet_wrap(~ rbinary, ncol = 2) +
+    theme(legend.position = "bottom",
+          strip.background = element_blank())
+```
+
+
+```{r plot_together_log}
+#also trying logarithmic scale for raw counts of student ethnicity
+ggplot(data = stueth_map,
+             mapping = aes(x = long, y = lat,
+                 group = group,
+                 fill = stu_total))+ 
+    geom_polygon(color = "gray90", size = 0.05) +
+    coord_map(projection = "albers", lat0 = 39, lat1 = 45) +
+    scale_fill_viridis_c(option = "magma",
+                         trans = "log",
+                         labels = scales::comma)+
+    theme_map() + facet_wrap(~ race_ethnicity, ncol = 3) +
+    theme(strip.background = element_blank(),
+          legend.direction = "vertical") 
+```
