@@ -21,7 +21,7 @@ library(pacman)
 ```
 
 ```{r load-pkgs, echo=FALSE}
-pacman::p_load(edld652, tidyverse, psych, rio, here, forcats, arrow, dplyr, stringr, readr, tidyr)
+pacman::p_load(edld652, tidyverse, psych, rio, here, forcats, arrow, dplyr, stringr, readr, tidyr, corrplot, Hmisc)
 ```
 
 ```{r calldata, echo=FALSE, eval=FALSE, results='hide'}
@@ -57,7 +57,7 @@ e4
 
 ```{r ethnic5, echo=FALSE, eval=FALSE, results='hide'}
 e5 <- e4 %>%
-  group_by(ST, LEAID, RACE_ETHNICITY) %>%
+  group_by(LEAID, RACE_ETHNICITY) %>%
   summarize(student = sum(STUDENT_COUNT))
 
 e5
@@ -71,11 +71,11 @@ e6
 ```
 
 ```{r savec, echo=FALSE, eval=FALSE, results='hide'}
-write.csv(e6, "ethnicity2.csv")
+# write.csv(e6, "ethnicity.csv")
 ```
 
 ```{r calldata2, echo=FALSE, results='hide'}
-ed <- read.csv("/Users/cassiemalcom/Desktop/CM2020/22_Winter Term Classes/EDLD 652_DS2/EDLD652_FinalPrj/Data/ethnicity2.csv")
+ed <- read.csv("/Users/cassiemalcom/Desktop/CM2020/22_Winter Term Classes/EDLD 652_DS2/EDLD652_FinalPrj/Data/ethnicity.csv")
 
 ed
 ```
@@ -104,20 +104,82 @@ ed4
 ```
 
 How to get a table like this to scroll on knitting to HTML?
-```{r minorities}
+```{r minorities, echo=FALSE, results='hide'}
 ed4$minority <- rowSums(ed4[ , c(3,4,5,6,7)], na.rm=TRUE)
 
 ed4
 ```
 
-```{r}
+```{r percentages, echo=FALSE, results='hide'}
 ed5 <- ed4 %>%
   mutate(percentW = round(White/total*100, digits = 2), percentM = round(minority/total*100, digits = 2))
 
 ed5
 ```
 
-```{r}
+```{r textbkdata, echo=FALSE, results='hide'}
+tbd <- get_data("NCES_CCD_fiscal_district_2018")
 
+tbd
 ```
+
+```{r tbd2, echo=FALSE, results='hide'}
+tbd2 <- tbd %>%
+  select(LEAID, V33, V93, STABBR)
+
+tbd2
+```
+
+```{r tbd3, echo=FALSE, results='hide'}
+ tbd3 <- tbd2 %>%
+  filter(V93 >= 0)
+
+tbd3
+```
+
+```{r tbd3convert, echo=FALSE, results='hide'}
+tbd3$LEAID <- as.numeric(as.character(tbd3$LEAID))
+
+tbd3
+```
+
+
+```{r tbd4join, echo=FALSE, results='hide'}
+tbd4 <- left_join(ed5, tbd3, by = "LEAID")
+
+tbd4
+```
+
+```{r p1, echo=FALSE}
+p1 <- tbd4 %>%
+  ggplot(aes(V93, percentM)) +
+  geom_point()
+
+p1
+```
+
+```{r p2, echo=FALSE}
+p2 <- tbd4 %>%
+  ggplot(aes(V93, percentW)) +
+  geom_point()
+
+p2
+```
+
+```{r}
+tbd5 <- tbd4 %>%
+  select(total, V93, percentM, percentW)
+
+tbd5
+```
+
+Could not get these results to plot via corrplot. I don't see any significant correlation though so this might not be a RQ that we want to continue with.
+```{r}
+mycorr <- rcorr(as.matrix(tbd5))
+
+mycorr
+```
+
+
+
 
