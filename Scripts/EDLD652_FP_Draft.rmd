@@ -24,7 +24,7 @@ knitr::opts_chunk$set(echo = TRUE,
 ```
 
 ```{r load packages}
-pacman::p_load("tidyverse","rio","here","janitor", "usmap","maps", "colorspace","geofacet", "viridis","ggthemes","arrow", "forcats", "ggrepel")
+pacman::p_load("tidyverse","rio","here","janitor", "usmap","maps", "colorspace","geofacet", "viridis","ggthemes","arrow", "forcats", "ggrepel", edld652, psych, dplyr, stringr, readr, tidyr, corrplot, Hmisc)
 ```
 
 ## RQ1
@@ -717,6 +717,162 @@ us %>%
 
 ```
 
+***Research Question 3
+```{r calldata, echo=FALSE, eval=FALSE, results='hide'}
+ethnic <- get_data("NCES_CCD_nonfiscal_school_2019_membership")
+
+ethnic
+```
+
+```{r ethnic2, echo=FALSE, eval=FALSE, results='hide'}
+e2 <- ethnic %>%
+  filter(!is.na(STUDENT_COUNT))
+
+e2
+```
+
+```{r ethnic3, echo=FALSE, eval=FALSE, results='hide'}
+e3 <- e2 %>%
+  filter((GRADE=="Grade 9")|(GRADE=="Grade 10")|(GRADE=="Grade 11")|(GRADE=="Grade 12")|(str_detect(SCH_NAME, "High")))
+
+e3
+```
+
+```{r checknames, echo=FALSE, eval=FALSE, results='hide'}
+colnames(e3)
+```
+
+```{r ehtnic4, echo=FALSE, eval=FALSE, results='hide'}
+e4 <- e3 %>%
+  select(LEAID, GRADE, SCH_NAME, SCHOOL_YEAR, RACE_ETHNICITY, SEX, STUDENT_COUNT, ST)
+
+e4
+```
+
+```{r ethnic5, echo=FALSE, eval=FALSE, results='hide'}
+e5 <- e4 %>%
+  group_by(LEAID, RACE_ETHNICITY) %>%
+  summarize(student = sum(STUDENT_COUNT))
+
+e5
+```
+Filter out the "no category codes" and "not specified", "two or more races"
+```{r ethnic6, echo=FALSE, eval=FALSE, results='hide'}
+e6 <- e5 %>%
+  filter(RACE_ETHNICITY!="Not Specified" & RACE_ETHNICITY!="No Category Codes" & RACE_ETHNICITY!="Two or more races")
+
+e6
+```
+
+```{r savec, echo=FALSE, eval=FALSE, results='hide'}
+# write.csv(e6, "ethnicity.csv")
+```
+
+```{r calldata2, echo=FALSE, results='hide'}
+ed <- read.csv("/Users/cassiemalcom/Desktop/CM2020/22_Winter Term Classes/EDLD 652_DS2/EDLD652_FinalPrj/Data/ethnicity.csv")
+
+ed
+```
+
+```{r ethnicdata2, echo=FALSE, results='hide'}
+ed2 <- ed %>%
+  select(c(2,3,4))
+
+ed2
+```
+
+```{r ethnicdata3, echo=FALSE, results='hide'}
+ed3 <- ed2 %>%
+  group_by(LEAID) %>%
+  mutate(total = sum(student))
+
+ed3
+```
+
+Need to get all minorities into one sum. Pivot?
+```{r ethnicdata3, echo=FALSE, results='hide'}
+ed4 <- ed3 %>%
+  pivot_wider(names_from = RACE_ETHNICITY, values_from = student)
+
+ed4
+```
+
+How to get a table like this to scroll on knitting to HTML?
+```{r minorities, echo=FALSE, results='hide'}
+ed4$minority <- rowSums(ed4[ , c(3,4,5,6,7)], na.rm=TRUE)
+
+ed4
+```
+
+```{r percentages, echo=FALSE, results='hide'}
+ed5 <- ed4 %>%
+  mutate(percentW = round(White/total*100, digits = 2), percentM = round(minority/total*100, digits = 2))
+
+ed5
+```
+
+```{r textbkdata, echo=FALSE, results='hide'}
+tbd <- get_data("NCES_CCD_fiscal_district_2018")
+
+tbd
+```
+
+```{r tbd2, echo=FALSE, results='hide'}
+tbd2 <- tbd %>%
+  select(LEAID, V33, V93, STABBR)
+
+tbd2
+```
+
+```{r tbd3, echo=FALSE, results='hide'}
+ tbd3 <- tbd2 %>%
+  filter(V93 >= 0)
+
+tbd3
+```
+
+```{r tbd3convert, echo=FALSE, results='hide'}
+tbd3$LEAID <- as.numeric(as.character(tbd3$LEAID))
+
+tbd3
+```
+
+
+```{r tbd4join, echo=FALSE, results='hide'}
+tbd4 <- left_join(ed5, tbd3, by = "LEAID")
+
+tbd4
+```
+
+```{r p1, echo=FALSE}
+p1 <- tbd4 %>%
+  ggplot(aes(V93, percentM)) +
+  geom_point()
+
+p1
+```
+
+```{r p2, echo=FALSE}
+p2 <- tbd4 %>%
+  ggplot(aes(V93, percentW)) +
+  geom_point()
+
+p2
+```
+
+```{r}
+tbd5 <- tbd4 %>%
+  select(total, V93, percentM, percentW)
+
+tbd5
+```
+
+Could not get these results to plot via corrplot. I don't see any significant correlation though so this might not be a RQ that we want to continue with.
+```{r}
+mycorr <- rcorr(as.matrix(tbd5))
+
+mycorr
+```
 
 
 
