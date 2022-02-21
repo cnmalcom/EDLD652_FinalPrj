@@ -391,13 +391,11 @@ ggplot(data = stueth_map,
 
 ```{r load data}
 
-#rla_sc <- get_data("EDFacts_rla_achievement_sch_2010_2019")
-rla_sc <- import(here("Data", "rla_sc.csv"))  #rla_sc file is included in gitignore. 
+rla_sc <- get_data("EDFacts_rla_achievement_sch_2010_2019")
+#rla_sc <- import(here("Data", "rla_sc.csv"))  #uncomment this read from your local. 
 fis08 <- import(here("Data","fis08.csv"))
 math_sc <- import(here("Data", "math_sc.csv"))
 enroll <- import(here("Data", "dm_total.rda"))
-#member_sc <- import(here("Data", "school-membership-17-21.parquet"))
-#member_ds <- import(here("Data", "district-membership-17-21.parquet"))
 #rla_sc <- import(here("Data", "rla_sc.csv")) file is too big, I can't push it to github
 
 ```
