@@ -24,7 +24,7 @@ knitr::opts_chunk$set(echo = TRUE,
 ```
 
 ```{r load packages}
-pacman::p_load("tidyverse","rio","here","janitor", "usmap","maps", "colorspace","geofacet", "viridis","ggthemes","arrow", "forcats", "ggrepel","edld652")
+pacman::p_load("tidyverse","rio","here","janitor", "usmap","maps", "colorspace","geofacet","leaidr", "viridis","ggthemes","arrow", "forcats", "ggrepel","edld652", "mapproj")
 ```
 
 ## RQ1
@@ -453,7 +453,7 @@ all<- left_join(all,enroll) %>%
 
 ```
 
-Plots to compare students proficiency level across states and how it differs based on students' characteristics. 
+#### Plots to compare students proficiency level across states and how it differs based on students' characteristics. 
 
 ```{r plots}
 #Planning to have interactive plots with all student as gray background and other characteristics with color on top of the gray bar. 
@@ -466,7 +466,11 @@ all %>%
     ggplot()+
    geom_col(aes(meanrla, fct_reorder(stnam, meanrla)), fill = "grey80") + 
     scale_x_continuous(expand = c(0,0),
-                        limits = c(0,100) )
+                        limits = c(0,100) ) +
+   labs(title = "Percentage of students at and above RLA proficiency across states",
+       subtitle = "All High School Students Category",
+         y = "",
+       x= "Percent of students at and above RLA proficiency")
 
 #proficiency level for english language learner
 all %>% 
@@ -479,7 +483,7 @@ all %>%
   scale_x_continuous(expand = c(0,0), 
                      limits = c(0,100))+ 
   labs(title = "Percentage of students at and above RLA proficiency across states",
-       subtitle = "All High School Students Category",
+       subtitle = "English Language Learners Category",
          y = "",
        x= "Percent of students at and above RLA proficiency")
                  
@@ -538,7 +542,7 @@ state_pct<- all %>%
 state_joined<-left_join(state_textbook, state_pct)
 ```
 
-
+#### Relationship between Textbook Spending & RLA / Math Achievement 
 ```{r}
 state_textbook  %>% 
   ggplot()+
@@ -575,6 +579,7 @@ state_joined%>%
        y = "Percent of Students at Proficiency Level")
 ```
 
+#### Relationship between Textbook Spending per Student and Language proficiency Across the States
 
 ```{r}
 cek <- all %>% 
@@ -608,8 +613,8 @@ cek <- all %>%
 cek  
 
 ```
-
-```{r}
+#### Variation in District Textbook Spending for each state
+```{r eval=FALSE, include=FALSE}
 #Check the state with the highest proficiency level: Virginia 
 textbook_va <- all %>% 
   filter(stnam == "Virginia")
@@ -630,9 +635,12 @@ va_book <- left_join(va, textbook_va,by = c("GEOID" = "leaid")) %>%
 
 va_book
 ```
+##### Example for West Virginia
+ * Attaching the example plot as an image here because it requires specific setting to run. 
 
+![West Virginia plot](images/wv.png){width = 8}
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 #Check the state with the lowest proficiency level: West Virginia 
 textbook_wv <- all %>% 
   filter(stnam == "West Virginia")
@@ -649,7 +657,8 @@ wv_book <- left_join(wv, textbook_wv,by = c("GEOID" = "leaid")) %>%
         legend.direction = "horizontal",
         legend.key.size = unit(1, 'cm'),
         legend.key.height = unit(.5,"cm")) +
-  labs(fill = "Textbook funding per student")
+  labs(title= "Textbook spending per school district in the State of West Virginia",
+         fill = "Textbook funding per student")
 
 wv_book
 
@@ -657,9 +666,11 @@ wv_book
 
 
 
+##### Visualizing textbook spending for school district in Oregon: 
+ * Attaching the example plot as an image here because it requires specific setting to run. 
+![Oregon plot](images/or.png){width = 8}
 
-Visualizing textbook spending for school district in Oregon as an example: 
-```{r oregon-textbookplot}
+```{r oregon-textbookplot, eval=FALSE, include=FALSE}
 #  Oregon 
 textbook_or <- all %>% 
   filter(stnam == "Oregon")
@@ -676,7 +687,8 @@ or_book <- left_join(or, textbook_or,by = c("GEOID" = "leaid")) %>%
         legend.direction = "horizontal",
         legend.key.size = unit(1, 'cm'),
         legend.key.height = unit(.5,"cm")) +
-  labs(fill = "Textbook funding per student")
+  labs(fill = "Textbook funding per student", 
+       title= "Textbook spending per school district in the State of Oregon")
 
 or_book
 ```
