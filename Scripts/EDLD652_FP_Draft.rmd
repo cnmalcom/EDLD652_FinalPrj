@@ -24,7 +24,7 @@ knitr::opts_chunk$set(echo = TRUE,
 ```
 
 ```{r load packages}
-pacman::p_load("tidyverse","rio","here","janitor", "usmap","maps", "colorspace","geofacet", "viridis","ggthemes","arrow", "forcats", "ggrepel")
+pacman::p_load("tidyverse","rio","here","janitor", "usmap","maps", "colorspace","geofacet", "viridis","ggthemes","arrow", "forcats", "ggrepel","edld652")
 ```
 
 ## RQ1
