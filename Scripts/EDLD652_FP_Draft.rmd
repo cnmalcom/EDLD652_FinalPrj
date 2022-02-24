@@ -214,6 +214,7 @@ dm18_long %>%
 ```
 
 ```{r plot_percentage, fig.height= 10, fig.width= 10}
+
 dm18_long %>% 
     group_by(st, race_ethnicity) %>% 
     summarise(
@@ -222,7 +223,7 @@ dm18_long %>%
     group_by(st) %>% 
     mutate(
         total = sum(stu_total),
-        percent_s = round((stu_total*100/total),3)
+        percent_s = round((stu_total*100/total),3) #this is really smart!
     ) %>% 
     ggplot(aes(x = race_ethnicity, y = percent_s))+
     geom_col()+
@@ -249,11 +250,11 @@ dm18_long %>%
     ) %>% 
     ggplot(aes(x = race_ethnicity, 
                y = percent_s, 
-               fill = race_ethnicity))+
+               fill = race_ethnicity))+ #Possibly a different color palette would improve readability — the rainbow palette implies some order that your data don't imply. 
     geom_col(show.legend = FALSE)+
     coord_flip()+
     theme_bw() +
-    facet_geo(~ st, grid = "us_state_grid2")
+    facet_geo(~ st, grid = "us_state_grid2") #This is so fun! I'm not sure it's the easiest thing to interpret though
 
 ```
 
@@ -342,6 +343,8 @@ ggplot(data = subset(stueth_map, race_ethnicity != "White"),
     theme_map() + facet_wrap(~ race_ethnicity, ncol = 3) +
     theme(legend.position = "bottom",
           strip.background = element_blank()) 
+
+#This is super effective
 ```
 
 
@@ -364,6 +367,8 @@ sm18_long %>%
     theme_map() + facet_wrap(~ rbinary, ncol = 2) +
     theme(legend.position = "bottom",
           strip.background = element_blank())
+
+#This is a very effective pair of plots for comparison. Adding titles and changing the legend label would help make them more interpretable (especially making the titles match for both maps)
 ```
 
 
@@ -381,6 +386,8 @@ ggplot(data = stueth_map,
     theme_map() + facet_wrap(~ race_ethnicity, ncol = 3) +
     theme(strip.background = element_blank(),
           legend.direction = "vertical") 
+
+#This is an interesting approach...I think logarithmic scales might be more effective for plots that have axis labels, as I worry that this is somewhat misleading because the color gradient feels like it's going to be consistent. Not sure though, just the impression I get from it - it is definitely more effective for communicating nuance in the maps where there is very little density in the corresponding racial/ethnic group. Possibly including both would be useful but making sure to label them separately — or even including a section where you only include this for the groups where differences by state are hard to see above?
 ```
 
 
@@ -620,7 +627,7 @@ textbook_va <- all %>%
   filter(stnam == "Virginia")
   
 
-va <- lea_get(state = "va") %>% 
+va <- lea_get(state = "va") %>% #I'm not sure what this does, I get an error saying there's no "lea_get" function — is this in some package that isn't loaded here?
     sf::st_as_sf() 
 
 va_book <- left_join(va, textbook_va,by = c("GEOID" = "leaid")) %>% 
@@ -723,7 +730,7 @@ us %>%
         legend.key.height = unit(.5,"cm")) +
   labs(fill = "Textbook funding per student")
 
-
+us
 
 ```
 
