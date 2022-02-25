@@ -33,7 +33,7 @@ pacman::p_load("tidyverse","rio","here","janitor", "usmap","maps", "colorspace",
 
 ```{r rq1-subset-data, eval = FALSE}
 #We used "district-membership-17-21.parquet" file. Being too big, we created a subset of this data and stored it our local. Yet, this is how we cleaned the data
-dm <- read_parquet(here("district-membership-17-21.parquet"))
+dm <- read_parquet(here("Data", "district-membership-17-21.parquet"))
 
 dm_s <- dm %>% 
   select(GRADE,LEAID,LEA_NAME,RACE_ETHNICITY,
@@ -727,6 +727,7 @@ us %>%
 
 ```
 
+Great project guys! I was unable to load the data in (possibly too large for my computer?) but I was able to follow your code and use the HTML in an effort to still provide a good review for you all so I will simply make comments for you here. Your plot 1 was super cool to see, I like that you include all states and the breakdown. I am not sure how it would look but a suggestion I have is to maybe use the scale_x_log10 for your x axis and see how that may look with your data. Would also be nice to see some different color I think either a fill or a color would be great, nothing crazy just something to switch it up from the normal color! Your plot 2 is incredibly cool I love that you used the bar charts of states in the shape of the US. I wonder if that plot would benefit with using a key to show what each color represents instead of having it off to the side on some of them, just a suggestion! I really like the use of color for plot 3 I thought it was very well done. Could use some unique descriptions (title, axes, subtitle, etc) but otherwise overall very cool. The first plot with the faceted maps may be a bit hard to see since its white on a few of them so it just kind of fades out and blends in, maybe use a different color scale for that one, I like the other colors a lot though. I like the different colors you used on each plot for research questions 2a and 2b. It might be more appealing to the eye to have each plot reordered so that it went from most to least instead of by state name. You could try to incorporate some sort of gganimate in your geom_points for fun to see if you could hover over the name of the state and have a value show up! The textbook spending plot with blue and red colors is super cool I like that one a lot! Very well done and easy to interpret what each piece of that plot represents. If you can get that oregon district plot ran that would be a really awesome inclusion as well. I think this project was super cool and well thought out. You did a good job at including a lot of different types of visuals and it was very creative. Can't wait to see the final project!
 
 
 
