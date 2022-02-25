@@ -247,7 +247,7 @@ dm18_long %>%
         total = sum(stu_total),
         percent_s = round((stu_total*100/total),3)
     ) %>% 
-    ggplot(aes(x = race_ethnicity, 
+    ggplot(aes(x = fct_reorder(race_ethnicity, percent_s), 
                y = percent_s, 
                fill = race_ethnicity))+
     geom_col(show.legend = FALSE)+
@@ -255,6 +255,7 @@ dm18_long %>%
     theme_bw() +
     facet_geo(~ st, grid = "us_state_grid2")
 
+#RG wow I really liked how this turned out! I added reorder so that the race/ethnicity would be ordered by percent
 ```
 
 #### Plot 3: Maps
@@ -600,7 +601,7 @@ cek <- all %>%
   labs(title = "Relationship between Textbook Spending per Student and Language proficiency", 
        x= "Percent of students at and above proficiency level",
        y="",
-       size= "Spending on textbook per student",
+       size= "Spending on textbook per student (dollars)",
        color="",
        legend= "") +
    theme(legend.position = "bottom",
@@ -608,10 +609,11 @@ cek <- all %>%
         legend.key.size = unit(1, 'cm'),
         legend.key.height = unit(.5,"cm"), 
         plot.title = element_text(hjust = 0),
-        plot.title.position = "plot")
+        plot.title.position = "plot") 
 
 cek  
 
+#RG I added a key to show that the size of the circles represent dollars.
 ```
 #### Variation in District Textbook Spending for each state
 ```{r eval=FALSE, include=FALSE}
