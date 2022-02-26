@@ -33,13 +33,13 @@ pacman::p_load("tidyverse","rio","here","janitor", "usmap","maps", "colorspace",
 
 ```{r rq1-subset-data, eval = FALSE}
 #We used "district-membership-17-21.parquet" file. Being too big, we created a subset of this data and stored it our local. Yet, this is how we cleaned the data
-dm <- read_parquet(here("district-membership-17-21.parquet"))
+dm <- read_parquet(here("data", "district-membership-17-21.parquet"))
 
 dm_s <- dm %>% 
   select(GRADE,LEAID,LEA_NAME,RACE_ETHNICITY,
          SCHOOL_YEAR,SEX,ST,STATENAME, STUDENT_COUNT, YEAR) %>% 
   filter(YEAR %in% c("2017","2018")) #some teacher-ethnicity data is for year 2017
-rm(dm) #freeing space
+rm(dm) #freeing space  # did not know this, neat!
 
 unique(dm_s$GRADE)
 #"Grade 6"           "Grade 7"           "Grade 8"          
@@ -83,7 +83,7 @@ dm_total <- dm_s %>%
 #weird that each district is occuring two times. let's just keep one.
 
 dm_total <- dm_total %>% 
-  distinct()
+  distinct()  # learning more from you all. Saving these codes in my R notes :)
 
 length(unique(dm_total$LEAID)) #this doesn't match our dm_total dimensions. 
 
@@ -97,9 +97,11 @@ dm_total <- dm_total %>%
 #In all other cases (NV, OR, VT), both rows have very close values.
 #Let's keep the higher of the two.
 
+## I like your thought process on this!
+
 temp <- dm_total %>%
   filter(n ==2) %>% 
-  slice(which.max(STUDENT_COUNT))
+  slice(which.max(STUDENT_COUNT)) # I forget what slice() is but have seen another group use it too so need to look it up
 
 #Let's join them
 
@@ -207,7 +209,7 @@ dm18_long %>%
     ) %>% 
     ggplot(aes(x = race_ethnicity, y = stu_total))+
     geom_col()+
-    scale_y_log10()+
+    scale_y_log10()+  # this one code piece makes such a difference!
     coord_flip()+
     facet_wrap(~st)
 #Some variation, but still hard to make much sense due to log scale
@@ -230,7 +232,7 @@ dm18_long %>%
     facet_wrap(~st)
 
 #this turned out well. 
-
+# This is neat but I feel there is a lot going on here. Maybe once you add a title and modify axis titles things will visually look more congruent. Still so many squares... Also, add some color and make it pop! :)
 ```
 
 #### Plot 2: Bar charts with different layout 
@@ -254,7 +256,7 @@ dm18_long %>%
     coord_flip()+
     theme_bw() +
     facet_geo(~ st, grid = "us_state_grid2")
-
+## this is so cool! Here's the color I was looking for!! The words are kind of squishing together though.
 ```
 
 #### Plot 3: Maps
@@ -298,6 +300,8 @@ plots[[i]] <- plot_usmap(data = sm_2018, values = race[i], color = "gray")+
         )
 print(plots[[i]])
 }
+
+# Beyond great! I really like the gradient colors chosen.
 ```
 
 
@@ -364,6 +368,8 @@ sm18_long %>%
     theme_map() + facet_wrap(~ rbinary, ncol = 2) +
     theme(legend.position = "bottom",
           strip.background = element_blank())
+
+# Oh this is a nice comparison- I like this. Great contrasting colors too. I think centering the legend would add to the aesthetics.
 ```
 
 
@@ -380,7 +386,11 @@ ggplot(data = stueth_map,
                          labels = scales::comma)+
     theme_map() + facet_wrap(~ race_ethnicity, ncol = 3) +
     theme(strip.background = element_blank(),
-          legend.direction = "vertical") 
+          legend.direction = "horizontal",
+          legend.position = "bottom",
+          )
+
+# for some reason the map for White students is cut off by the legend. I moved the legend to the bottom to fix that. But you can also move it to the top of the maps or elsewhere.
 ```
 
 
@@ -396,7 +406,7 @@ rla_sc <- get_data("EDFacts_rla_achievement_sch_2010_2019")
 fis08 <- import(here("Data","fis08.csv"))
 math_sc <- import(here("Data", "math_sc.csv"))
 enroll <- import(here("Data", "dm_total.rda"))
-#rla_sc <- import(here("Data", "rla_sc.csv")) file is too big, I can't push it to github
+#rla_sc <- import(here("Data", "rla_sc.csv")) file is too big, I can't push it to github  ## did it not work as a parquet file either?
 
 ```
 
@@ -412,6 +422,8 @@ math_sc <- math_sc %>%
 
 math_sc$math_pctabove <- sub(".*-(.*)", "\\1", math_sc$math_pctabove) 
 math_sc$math_pctabove <- as.numeric(math_sc$math_pctabove)
+# one thing I learned is that I learned from the HW is that you can use readr::parse_number() for as.numeric and you will know what NAs are being introduced by coercion
+
 math_sc$leaid <- as.character(math_sc$leaid)
 math_sc$ncessch <- as.character(math_sc$ncessch)
   
@@ -456,7 +468,7 @@ all<- left_join(all,enroll) %>%
 #### Plots to compare students proficiency level across states and how it differs based on students' characteristics. 
 
 ```{r plots}
-#Planning to have interactive plots with all student as gray background and other characteristics with color on top of the gray bar. 
+#Planning to have interactive plots with all student as gray background and other characteristics with color on top of the gray bar. I like this idea, think it would look really good!
 #all students 
 all %>% 
   filter(identity == "all") %>% 
@@ -519,7 +531,7 @@ all %>%
          y = "",
        x= "Percent of students at and above RLA proficiency")
 
-
+# these are nice! I think factoring in descending order like the first will make these other three plots look better.
 ```
 
 ### 2b. What is the relationship between district spending on textbook and students proficiency level? 
@@ -611,7 +623,7 @@ cek <- all %>%
         plot.title.position = "plot")
 
 cek  
-
+# I'm confused why there is a true/false color legend? Is that true/false from being less than the national average? If so, I think that is repetitive information not needed.
 ```
 #### Variation in District Textbook Spending for each state
 ```{r eval=FALSE, include=FALSE}
@@ -634,6 +646,8 @@ va_book <- left_join(va, textbook_va,by = c("GEOID" = "leaid")) %>%
   labs(fill = "Textbook funding per student")
 
 va_book
+
+# Can't run this code, can't find the function 'lea_get'.
 ```
 ##### Example for West Virginia
  * Attaching the example plot as an image here because it requires specific setting to run. 
@@ -662,6 +676,7 @@ wv_book <- left_join(wv, textbook_wv,by = c("GEOID" = "leaid")) %>%
 
 wv_book
 
+# same here. I'm sure this plot will look great based on previous plots the group has!
 ```
 
 
@@ -723,7 +738,7 @@ us %>%
         legend.key.height = unit(.5,"cm")) +
   labs(fill = "Textbook funding per student")
 
-
+# I have no idea what package I can get to install lea_get function. I looked online for awhile but kept getting websites for leagues. The help document was not existent when I tried that. Where did you all find this function? Sorry I couldn't look through the last plots but things have been looking amazing.
 
 ```
 
