@@ -33,7 +33,7 @@ pacman::p_load("tidyverse","rio","here","janitor", "usmap","maps", "colorspace",
 
 ```{r rq1-subset-data, eval = FALSE}
 #We used "district-membership-17-21.parquet" file. Being too big, we created a subset of this data and stored it our local. Yet, this is how we cleaned the data
-dm <- read_parquet(here("district-membership-17-21.parquet"))
+dm <- read_parquet(here("data","district-membership-17-21.parquet")) #added "data", wasn't loading for me without it
 
 dm_s <- dm %>% 
   select(GRADE,LEAID,LEA_NAME,RACE_ETHNICITY,
@@ -197,6 +197,19 @@ dm18_long %>%
 
 #Some variation is seem, but most numbers are collapsed due to common x-axis.
 #trying log transformation and percentage
+
+#Nice use of tidyverse code
+#This is very cool and would let me work on a state level, but would need to be pretty big. Have you considered doing State as the Y axis and doing race as the facet? Code below. Depends on what you're trying to convey, I guess
+
+dm18_long %>% 
+  group_by(st, race_ethnicity) %>% 
+    summarise(
+        percent_d2 = mean(percent_d, na.rm = TRUE)
+    )%>% 
+    ggplot(aes(x = st, y = percent_d2))+
+    geom_col()+
+    coord_flip()+
+    facet_wrap(~race_ethnicity)
 ```
 
 ```{r plot_log, fig.height= 10, fig.width= 10}
@@ -211,6 +224,8 @@ dm18_long %>%
     coord_flip()+
     facet_wrap(~st)
 #Some variation, but still hard to make much sense due to log scale
+
+#Log scale is a cool idea though! These graphs are a bit small for log scale to be easily interpeted. I don't have much of a suggestion, sorry
 ```
 
 ```{r plot_percentage, fig.height= 10, fig.width= 10}
@@ -227,9 +242,13 @@ dm18_long %>%
     ggplot(aes(x = race_ethnicity, y = percent_s))+
     geom_col()+
     coord_flip()+
-    facet_wrap(~st)
+    facet_wrap(~st)+
+  theme(text = element_text(size= 25),
+        axis.text.x = element_text(size = 10))
 
 #this turned out well. 
+
+#Yep, looks great! I added code to make text bigger
 
 ```
 
@@ -251,9 +270,10 @@ dm18_long %>%
                y = percent_s, 
                fill = race_ethnicity))+
     geom_col(show.legend = FALSE)+
-    coord_flip()+
     theme_bw() +
     facet_geo(~ st, grid = "us_state_grid2")
+
+#Super neat! I took out coord_flip. Personally, I'd just remove the text and relegate it to a legend. This is a very cool idea. If states were more uniformly sized, it'd be cool to put these charts into the states themselves. But... they're not
 
 ```
 
@@ -278,6 +298,7 @@ sm_2018 <- dm18_long %>%
         values_from = c(stu_total,percent_s)
     ) 
 
+sm_2018 <- sm_2018 %>% clean_names()
 #check <- left_join(statepop, sm_2018, by = c("abbr" = "st")) %>% 
  #   select(-pop_2015)
 ```
@@ -285,7 +306,12 @@ sm_2018 <- dm18_long %>%
 #### Plot 3: Geographic maps for student ethnic percentage
 
 ```{r state_maps}
-race <- c("percent_s_White","percent_s_Black or African American", "percent_s_American Indian or Alaska Native","percent_s_Asian","percent_s_Hispanic/Latino","percent_s_Native Hawaiian or Other Pacific Islander")
+#race <- c("percent_s_White","percent_s_Black or African American", "percent_s_American Indian or Alaska Native","percent_s_Asian","percent_s_Hispanic/Latino","percent_s_Native Hawaiian or Other Pacific Islander")
+#computers are like that. I used clean_names() above for sm_2018, so the code below will run. That'll surely ruin other visualizations though :(
+
+
+race <- c("percent_s_american_indian_or_alaska_native", "percent_s_asian", "percent_s_black_or_african_american","percent_s_hispanic_latino", "percent_s_native_hawaiian_or_other_pacific_islander", "percent_s_two_or_more_races", "percent_s_white")
+
 
 plots <- vector("list", length(race))
 
@@ -298,6 +324,8 @@ plots[[i]] <- plot_usmap(data = sm_2018, values = race[i], color = "gray")+
         )
 print(plots[[i]])
 }
+
+#These visualizations are great! A bigger title and legend would be helpful, but that's about it for me
 ```
 
 
@@ -329,6 +357,8 @@ ggplot(data = stueth_map,
     theme_map() + facet_wrap(~ race_ethnicity, ncol = 3) +
     theme(legend.position = "bottom",
           strip.background = element_blank()) 
+
+#Nice use of facet_wrap, but I think these would be more legible as individual visualizations
 ```
 
 ```{r plot_together_2}
@@ -338,10 +368,14 @@ ggplot(data = subset(stueth_map, race_ethnicity != "White"),
                  fill = percent_s))+
     geom_polygon(color = "gray90", size = 0.05) +
     coord_map(projection = "albers", lat0 = 39, lat1 = 45) +
-    scale_fill_viridis_c(option = "magma")+
+    #scale_fill_viridis_c(option = "plasma")+
+  scale_fill_continuous_sequential(palette = "Reds 3") +
     theme_map() + facet_wrap(~ race_ethnicity, ncol = 3) +
     theme(legend.position = "bottom",
           strip.background = element_blank()) 
+#Clean code! Makes it much easier for me to ruin your visualization.
+#You guys are really on it with these types of geographic plots
+#I prefer the other fill palette, although the plasma viridis option is nice too
 ```
 
 
@@ -363,7 +397,14 @@ sm18_long %>%
     scale_fill_viridis_c(option = "magma")+
     theme_map() + facet_wrap(~ rbinary, ncol = 2) +
     theme(legend.position = "bottom",
-          strip.background = element_blank())
+          strip.background = element_blank(),
+          legend.text = element_text(size=30),
+          legend.key.size = unit(2, 'cm'),
+          text = element_text(size = 30))
+  
+
+#Nice, 2 plots is manageable for me. Magma works for me on this one for some reason
+#I changed the font to be a bit more legible. I would do them individually, but I'm lazy
 ```
 
 
@@ -380,7 +421,14 @@ ggplot(data = stueth_map,
                          labels = scales::comma)+
     theme_map() + facet_wrap(~ race_ethnicity, ncol = 3) +
     theme(strip.background = element_blank(),
-          legend.direction = "vertical") 
+          legend.direction = "vertical") +
+theme(legend.position = "bottom",
+          strip.background = element_blank(),
+          legend.text = element_text(size=30),
+          legend.key.size = unit(2, 'cm'),
+          text = element_text(size = 30))
+
+#Added the same code chunk. These are nice
 ```
 
 
@@ -398,6 +446,8 @@ math_sc <- import(here("Data", "math_sc.csv"))
 enroll <- import(here("Data", "dm_total.rda"))
 #rla_sc <- import(here("Data", "rla_sc.csv")) file is too big, I can't push it to github
 
+
+#Loading these data isn't working for me, sorry!
 ```
 
 
