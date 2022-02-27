@@ -23,8 +23,10 @@ knitr::opts_chunk$set(echo = TRUE,
                       fig.height = 9)
 ```
 
-```{r load packages}
+```{r load-packages}
 pacman::p_load("tidyverse","rio","here","janitor", "usmap","maps", "colorspace","geofacet","leaidr", "viridis","ggthemes","arrow", "forcats", "ggrepel","edld652", "mapproj")
+
+#devtools::install_github("ivelasq/leaidr") I couldn't load leaidr and found this after googling
 ```
 
 ## RQ1
@@ -33,7 +35,7 @@ pacman::p_load("tidyverse","rio","here","janitor", "usmap","maps", "colorspace",
 
 ```{r rq1-subset-data, eval = FALSE}
 #We used "district-membership-17-21.parquet" file. Being too big, we created a subset of this data and stored it our local. Yet, this is how we cleaned the data
-dm <- read_parquet(here("district-membership-17-21.parquet"))
+dm <- read_parquet(here("Data", "district-membership-17-21.parquet")) #Amy: I needed to add "Data", to get this to work
 
 dm_s <- dm %>% 
   select(GRADE,LEAID,LEA_NAME,RACE_ETHNICITY,
@@ -90,7 +92,7 @@ length(unique(dm_total$LEAID)) #this doesn't match our dm_total dimensions.
 dm_total <- dm_total %>% 
   distinct() %>% 
   group_by(LEAID) %>% 
-  mutate(n=n()) #some districts have two rows
+  mutate(n = n()) #some districts have two rows
  
 #Some districts (44) have double reporting. 
 #Mostly in DC: On checking, one number points to 0 and another to a finite value. 
@@ -98,7 +100,7 @@ dm_total <- dm_total %>%
 #Let's keep the higher of the two.
 
 temp <- dm_total %>%
-  filter(n ==2) %>% 
+  filter(n == 2) %>% 
   slice(which.max(STUDENT_COUNT))
 
 #Let's join them
@@ -130,7 +132,8 @@ dm_sum <- dm_k12 %>%
     group_by(st, leaid, year) %>% 
     mutate(
         total = sum(student, na.rm = TRUE),
-        no_code = sum(if_else(race_ethnicity == "No Category Codes", student, 0)),
+        no_code = sum(if_else(race_ethnicity == "No Category Codes", 
+                              student, 0)),
         total_reported = total - no_code,
         flag = ifelse(no_code == total_reported, TRUE, FALSE)
     )
@@ -164,11 +167,14 @@ flag_f <- dm_sum %>%
 
 ```{r dm_2018}
 dm18_long <- dm_sum %>% 
-    filter(year == "2018" & flag != "FALSE" & !race_ethnicity %in% c("No Category Codes", "Not Specified")) %>% 
+    filter(year == "2018" 
+           & flag != "FALSE" 
+           & !race_ethnicity %in% c("No Category Codes", "Not Specified")) %>% 
     mutate(
-        percent_d = round((student/total_reported)*100, 3)
+        percent_d = round((student/total_reported) * 100, 3)
     ) %>% 
-    select(leaid, race_ethnicity, student, percent_d, total_reported, everything())
+    select(leaid, race_ethnicity, student, 
+           percent_d, total_reported, everything())
 
 #data in wide format
 dm18_wide <- dm18_long %>% 
@@ -213,7 +219,7 @@ dm18_long %>%
 #Some variation, but still hard to make much sense due to log scale
 ```
 
-```{r plot_percentage, fig.height= 10, fig.width= 10}
+```{r plot_percentage, fig.height = 10, fig.width = 10}
 dm18_long %>% 
     group_by(st, race_ethnicity) %>% 
     summarise(
@@ -222,12 +228,13 @@ dm18_long %>%
     group_by(st) %>% 
     mutate(
         total = sum(stu_total),
-        percent_s = round((stu_total*100/total),3)
+        percent_s = round((stu_total * 100 / total),3)
     ) %>% 
-    ggplot(aes(x = race_ethnicity, y = percent_s))+
-    geom_col()+
-    coord_flip()+
-    facet_wrap(~st)
+    ggplot(aes(x = race_ethnicity, y = percent_s)) +
+    geom_col() +
+    coord_flip() +
+    facet_wrap(~st) +
+  theme_minimal() #Amy: Consider theme_minimal and other adjustments to the theme, like removing some of the axis grid lines, adjusting title, axis, and race/ethnicity labels
 
 #this turned out well. 
 
@@ -236,7 +243,7 @@ dm18_long %>%
 #### Plot 2: Bar charts with different layout 
 
 
-```{r plot_geofacet, fig.height= 10, fig.width= 12}
+```{r plot_geofacet, fig.height = 10, fig.width = 12}
 dm18_long %>% 
     group_by(st, race_ethnicity) %>% 
     summarise(
@@ -245,15 +252,16 @@ dm18_long %>%
     group_by(st) %>% 
     mutate(
         total = sum(stu_total),
-        percent_s = round((stu_total*100/total),3)
+        percent_s = round((stu_total * 100 / total), 3)
     ) %>% 
     ggplot(aes(x = race_ethnicity, 
                y = percent_s, 
                fill = race_ethnicity))+
     geom_col(show.legend = FALSE)+
-    coord_flip()+
+    coord_flip() +
     theme_bw() +
-    facet_geo(~ st, grid = "us_state_grid2")
+    facet_geo(~ st, grid = "us_state_grid2") +
+  theme_minimal() #Amy: Consider (a) theme_minimal() and other adjustments to the theme, like removing some of the axis grid lines, and (b) adding/adjusting title, axis, and race/ethnicity labels
 
 ```
 
@@ -270,12 +278,12 @@ sm_2018 <- dm18_long %>%
     group_by(st) %>% 
     mutate(
         total = sum(stu_total),
-        percent_s = round((stu_total*100/total),3),
+        percent_s = round((stu_total * 100 / total), 3),
         state = tolower(statename)
     ) %>% 
     pivot_wider(
         names_from = race_ethnicity,
-        values_from = c(stu_total,percent_s)
+        values_from = c(stu_total, percent_s)
     ) 
 
 #check <- left_join(statepop, sm_2018, by = c("abbr" = "st")) %>% 
@@ -285,16 +293,20 @@ sm_2018 <- dm18_long %>%
 #### Plot 3: Geographic maps for student ethnic percentage
 
 ```{r state_maps}
-race <- c("percent_s_White","percent_s_Black or African American", "percent_s_American Indian or Alaska Native","percent_s_Asian","percent_s_Hispanic/Latino","percent_s_Native Hawaiian or Other Pacific Islander")
+race <- c("percent_s_White",
+          "percent_s_Black or African American", 
+          "percent_s_American Indian or Alaska Native", 
+          "percent_s_Asian", 
+          "percent_s_Hispanic/Latino", 
+          "percent_s_Native Hawaiian or Other Pacific Islander")
 
 plots <- vector("list", length(race))
 
-
 for (i in seq_along(race)) {
-plots[[i]] <- plot_usmap(data = sm_2018, values = race[i], color = "gray")+
+plots[[i]] <- plot_usmap(data = sm_2018, values = race[i], color = "gray") +
     scale_fill_continuous_sequential(palette = "Red-Purple") +
     labs(
-        title = paste0("Distribution of ", race[i]," students")
+        title = paste0("Distribution of ", race[i], " students")
         )
 print(plots[[i]])
 }
@@ -312,11 +324,12 @@ sm18_long <- dm18_long %>%
     group_by(st) %>% 
     mutate(
         total = sum(stu_total),
-        percent_s = round((stu_total*100/total),3)
+        percent_s = round((stu_total * 100 / total), 3)
     ) %>%  
-    filter(!st %in% c("BI","AS","GU","PR","VI"))
+    filter(!st %in% c("BI", "AS", "GU", "PR", "VI"))
 
 sm18_long$region <- tolower(sm18_long$statename)
+
 stueth_map <- left_join(us_states, sm18_long)
 
 ggplot(data = stueth_map,
@@ -326,7 +339,8 @@ ggplot(data = stueth_map,
     geom_polygon(color = "gray90", size = 0.05) +
     coord_map(projection = "albers", lat0 = 39, lat1 = 45) +
     scale_fill_continuous_sequential(palette = "Reds 3") +
-    theme_map() + facet_wrap(~ race_ethnicity, ncol = 3) +
+    theme_map() + 
+  facet_wrap(~ race_ethnicity, ncol = 3) +
     theme(legend.position = "bottom",
           strip.background = element_blank()) 
 ```
@@ -339,7 +353,8 @@ ggplot(data = subset(stueth_map, race_ethnicity != "White"),
     geom_polygon(color = "gray90", size = 0.05) +
     coord_map(projection = "albers", lat0 = 39, lat1 = 45) +
     scale_fill_viridis_c(option = "magma")+
-    theme_map() + facet_wrap(~ race_ethnicity, ncol = 3) +
+    theme_map() + 
+  facet_wrap(~ race_ethnicity, ncol = 3) +
     theme(legend.position = "bottom",
           strip.background = element_blank()) 
 ```
@@ -378,7 +393,8 @@ ggplot(data = stueth_map,
     scale_fill_viridis_c(option = "magma",
                          trans = "log",
                          labels = scales::comma)+
-    theme_map() + facet_wrap(~ race_ethnicity, ncol = 3) +
+    theme_map() + 
+  facet_wrap(~ race_ethnicity, ncol = 3) +
     theme(strip.background = element_blank(),
           legend.direction = "vertical") 
 ```
@@ -389,7 +405,7 @@ ggplot(data = stueth_map,
 
 
 
-```{r load data}
+```{r load-data}
 
 rla_sc <- get_data("EDFacts_rla_achievement_sch_2010_2019")
 #rla_sc <- import(here("Data", "rla_sc.csv"))  #uncomment this read from your local. 
@@ -401,11 +417,11 @@ enroll <- import(here("Data", "dm_total.rda"))
 ```
 
 
-```{r select relevant variable}
+```{r select-relevant-variable}
 math_sc <- math_sc %>% 
   select(LEAID, STNAM, NCESSCH, ALL_MTHHSPCTPROF, MAM_MTHHSPCTPROF, MAS_MTHHSPCTPROF, MBL_MTHHSPCTPROF, MHI_MTHHSPCTPROF, MTR_MTHHSPCTPROF, MWH_MTHHSPCTPROF, CWD_MTHHSPCTPROF, ECD_MTHHSPCTPROF, LEP_MTHHSPCTPROF,HOM_MTHHSPCTPROF)  %>% 
   clean_names() %>% 
-  pivot_longer(cols= ends_with("prof"), 
+  pivot_longer(cols = ends_with("prof"), 
               names_to = "identity", 
               values_to = "math_pctabove",
               names_pattern = "(.*)_mthhspctprof")
@@ -419,7 +435,7 @@ math_sc$ncessch <- as.character(math_sc$ncessch)
 rla_sc <- rla_sc %>% 
    select(LEAID,STNAM, NCESSCH, ALL_RLAHSPCTPROF, MAM_RLAHSPCTPROF, MAS_RLAHSPCTPROF, MBL_RLAHSPCTPROF, MHI_RLAHSPCTPROF, MTR_RLAHSPCTPROF, MWH_RLAHSPCTPROF, CWD_RLAHSPCTPROF, ECD_RLAHSPCTPROF, LEP_RLAHSPCTPROF, HOM_RLAHSPCTPROF)  %>%  
   clean_names() %>% 
-  pivot_longer(cols= ends_with("prof"), 
+  pivot_longer(cols = ends_with("prof"), 
               names_to = "identity", 
               values_to = "rla_pctabove",
               names_pattern = "(.*)_rlahspctprof")
@@ -428,13 +444,14 @@ rla_sc$rla_pctabove <- as.numeric(rla_sc$rla_pctabove)
 
 
 fis08 <- fis08 %>% 
-  select(LEAID, "textbook"= V93, TOTALEXP, "instruction"= TCURINST , "supservice" = TCURSSVC ) %>% 
+  select(LEAID, "textbook" = V93, TOTALEXP, "instruction" = TCURINST , 
+         "supservice" = TCURSSVC ) %>% 
   clean_names()
 
 
 ```
 
-```{r join rla-math}
+```{r join-rla-math}
 all <- left_join(rla_sc, math_sc) %>% 
   left_join(fis08) 
 
@@ -445,12 +462,10 @@ enroll <- enroll %>%
 
 
 all<- left_join(all,enroll) %>% 
-  mutate(perstudbook = (textbook/student_count),
+  mutate(perstudbook = (textbook / student_count),
          stnam = stringr::str_to_title(stnam)) %>% 
   filter_all(all_vars(!is.infinite(.))) %>% 
   filter(!stnam == "Stnam")
-
-
 ```
 
 #### Plots to compare students proficiency level across states and how it differs based on students' characteristics. 
@@ -462,30 +477,36 @@ all %>%
   filter(identity == "all") %>% 
   group_by(stnam) %>% 
   summarise(meanmath = mean(math_pctabove, na.rm = TRUE), 
-            meanrla = mean(rla_pctabove, na.rm=TRUE)) %>% 
-    ggplot()+
+            meanrla = mean(rla_pctabove, na.rm = TRUE)) %>% 
+    ggplot() +
    geom_col(aes(meanrla, fct_reorder(stnam, meanrla)), fill = "grey80") + 
-    scale_x_continuous(expand = c(0,0),
-                        limits = c(0,100) ) +
+    scale_x_continuous(expand = c(0, 0),
+                        limits = c(0, 100)) +
    labs(title = "Percentage of students at and above RLA proficiency across states",
-       subtitle = "All High School Students Category",
-         y = "",
-       x= "Percent of students at and above RLA proficiency")
+        subtitle = "All High School Students Category",
+        y = "",
+        x = "Percent of students at and above RLA proficiency") + 
+  theme_minimal() + #Amy: Suggest theme_minimal and removing unnecessary axis grid lines
+  theme(panel.grid.major.y = element_blank(),
+        panel.grid.minor.x = element_blank())
 
 #proficiency level for english language learner
 all %>% 
   filter(identity == "lep") %>%
   group_by(stnam) %>% 
   summarise(meanmath = mean(math_pctabove, na.rm = TRUE), 
-            meanrla = mean(rla_pctabove, na.rm=TRUE)) %>% 
-  ggplot()+
-  geom_col(aes(meanrla, stnam), fill = "#EEC77E")+
-  scale_x_continuous(expand = c(0,0), 
-                     limits = c(0,100))+ 
+            meanrla = mean(rla_pctabove, na.rm = TRUE)) %>% 
+  ggplot() +
+  geom_col(aes(meanrla, stnam), fill = "#EEC77E") +
+  scale_x_continuous(expand = c(0, 0), 
+                     limits = c(0, 100)) + 
   labs(title = "Percentage of students at and above RLA proficiency across states",
        subtitle = "English Language Learners Category",
-         y = "",
-       x= "Percent of students at and above RLA proficiency")
+       y = "",
+       x = "Percent of students at and above RLA proficiency") + 
+  theme_minimal() + #Amy: Suggest theme_minimal and removing unnecessary axis grid lines
+  theme(panel.grid.major.y = element_blank(),
+        panel.grid.minor.x = element_blank())
                  
   
 #proficiency level for children with disability
@@ -493,15 +514,18 @@ all %>%
   filter(identity == "cwd") %>% 
   group_by(stnam) %>% 
   summarise(meanmath = mean(math_pctabove, na.rm = TRUE), 
-            meanrla = mean(rla_pctabove, na.rm=TRUE)) %>% 
-  ggplot()+
-  geom_col(aes(meanrla, stnam), fill = "#A1D2F1")+
-  scale_x_continuous(expand = c(0,0), 
-                     limits = c(0,100))+
+            meanrla = mean(rla_pctabove, na.rm = TRUE)) %>% 
+  ggplot() +
+  geom_col(aes(meanrla, stnam), fill = "#A1D2F1") +
+  scale_x_continuous(expand = c(0, 0), 
+                     limits = c(0, 100)) +
     labs(title = "Percentage of students at and above RLA proficiency across states",
        subtitle = "Students with disabililty category",
-         y = "",
-       x= "Percent of students at and above RLA proficiency")
+       y = "",
+       x = "Percent of students at and above RLA proficiency") + 
+  theme_minimal() + #Amy: Suggest theme_minimal and removing unnecessary axis grid lines
+  theme(panel.grid.major.y = element_blank(),
+        panel.grid.minor.x = element_blank())
 
 
 #proficiency level for Economically disadvantaged students
@@ -509,15 +533,18 @@ all %>%
   filter(identity == "ecd") %>% 
   group_by(stnam) %>% 
   summarise(meanmath = mean(math_pctabove, na.rm = TRUE), 
-            meanrla = mean(rla_pctabove, na.rm=TRUE)) %>% 
-  ggplot()+
-  geom_col(aes(meanrla, stnam), fill = "#F1A8A1")+
-  scale_x_continuous(expand = c(0,0), 
-                     limits = c(0,100)) +
+            meanrla = mean(rla_pctabove, na.rm = TRUE)) %>% 
+  ggplot() +
+  geom_col(aes(meanrla, stnam), fill = "#F1A8A1") +
+  scale_x_continuous(expand = c(0, 0), 
+                     limits = c(0, 100)) + #Amy: Suggest adding % symbols
   labs(title = "Percentage of High School students at and above RLA proficiency across states",
        subtitle = "Low-Income Students Category",
          y = "",
-       x= "Percent of students at and above RLA proficiency")
+       x = "Percent of students at and above RLA proficiency") +
+  theme_minimal() + #Amy: Suggest theme_minimal and removing unnecessary axis grid lines
+  theme(panel.grid.major.y = element_blank(),
+        panel.grid.minor.x = element_blank())
 
 
 ```
@@ -530,14 +557,14 @@ state_textbook <- all %>%
   distinct(stnam, textbook, student_count) %>% 
   drop_na() %>% 
   group_by(stnam) %>% 
-  summarise(state_per_student = sum(textbook)/sum(student_count)) 
+  summarise(state_per_student = sum(textbook) / sum(student_count)) 
 
 
-state_pct<- all %>% 
+state_pct <- all %>% 
   filter(identity == "all") %>% 
   group_by(stnam) %>% 
   summarise(meanmath = mean(math_pctabove, na.rm = TRUE), 
-            meanrla = mean(rla_pctabove, na.rm=TRUE))
+            meanrla = mean(rla_pctabove, na.rm = TRUE))
 
 state_joined<-left_join(state_textbook, state_pct)
 ```
@@ -545,38 +572,55 @@ state_joined<-left_join(state_textbook, state_pct)
 #### Relationship between Textbook Spending & RLA / Math Achievement 
 ```{r}
 state_textbook  %>% 
-  ggplot()+
-  geom_col(aes(state_per_student, fct_reorder(stnam, state_per_student)), fill = "#A1D2F1")+
-  scale_x_continuous(expand = c(0,0), 
-                     limits = c(0,110)) +
-  labs( x = "Textbook spending per student")
+  ggplot() +
+  geom_col(aes(state_per_student, fct_reorder(stnam, state_per_student)), fill = "#A1D2F1") +
+  scale_x_continuous(expand = c(0, 0), 
+                     limits = c(0, 110),
+                     labels = scales::dollar) + #Amy: Add $ sign
+  labs(x = "Textbook spending per student",
+       y = "") + #Amy: Removed y-axis label
+  theme_minimal() +  #Amy: Suggest theme_minimal and removing unnecessary axis grid lines
+  theme(panel.grid.major.y = element_blank(),
+        panel.grid.minor.x = element_blank()) 
 
-state_joined%>% 
-  filter(!state_per_student <0,
+state_joined %>% 
+  filter(!state_per_student < 0,
          !stnam == "North Dakota",
          !stnam == "Alaska") %>% #drop state with missing values
   ggplot(aes(state_per_student, meanmath))+
   geom_point() +
-  geom_smooth(method = "lm")+
-  geom_text_repel(aes(label = stnam))+
-  scale_x_continuous(expand = c(0,0)) +
+  geom_smooth(method = "lm") +
+  geom_text_repel(aes(label = stnam)) +
+  scale_x_continuous(expand = c(0, 0),
+                     labels = scales::dollar) + #Amy: Add $ sign
+  scale_y_continuous(breaks = c(40, 60, 80), 
+                     labels = c("40%", "60%", "80%")) + #Amy: Add % symbol (there are probably easier/different ways to do this)
   labs(title= "Textbook Spending & RLA Achievement",
       x = "Textbook spending per student", 
-       y = "Percent of Students at Proficiency Level")
+       y = "Percent of Students at Proficiency Level") + 
+  theme_minimal() + #Amy: Suggest theme_minimal and removing unnecessary axis grid lines
+  theme(panel.grid.minor.y = element_blank(),
+        panel.grid.minor.x = element_blank())
 
 
 state_joined%>% 
-  filter(!state_per_student <0,
+  filter(!state_per_student < 0,
          !stnam == "North Dakota",
          !stnam == "Alaska") %>% #drop state with missing values
   ggplot(aes(state_per_student, meanmath))+
   geom_point() +
-  geom_smooth(method = "lm")+
-  geom_text_repel(aes(label = stnam))+
-  scale_x_continuous(expand = c(0,0)) +
+  geom_smooth(method = "lm") +
+  geom_text_repel(aes(label = stnam)) +
+  scale_x_continuous(expand = c(0, 0),
+                     labels = scales::dollar) + #Amy: Add $ sign
+  scale_y_continuous(breaks = c(40, 60, 80), 
+                     labels = c("40%", "60%", "80%")) + #Amy: Add % symbol (there are probably easier/different ways to do this)
     labs(title= "Textbook Spending & Math Achievement",
       x = "Textbook spending per student", 
-       y = "Percent of Students at Proficiency Level")
+       y = "Percent of Students at Proficiency Level") + 
+  theme_minimal() + #Amy: Suggest theme_minimal and removing unnecessary axis grid lines
+  theme(panel.grid.minor.y = element_blank(),
+        panel.grid.minor.x = element_blank())
 ```
 
 #### Relationship between Textbook Spending per Student and Language proficiency Across the States
@@ -586,34 +630,38 @@ cek <- all %>%
   filter(identity == "all") %>% 
   group_by(stnam) %>% 
   mutate(meanmath = mean(math_pctabove, na.rm = TRUE), 
-            meanrla = mean(rla_pctabove, na.rm=TRUE),
-         low = ifelse(meanrla<=70.38, TRUE, FALSE)) %>% 
+            meanrla = mean(rla_pctabove, na.rm = TRUE),
+         low = ifelse(meanrla <= 70.38, TRUE, FALSE)) %>% 
   ggplot(aes(meanrla, stnam)) +
-  geom_point(aes(size = perstudbook, color = low))+
-  geom_vline(xintercept=70.38, 
+  geom_point(aes(size = perstudbook, color = low)) +
+  geom_vline(xintercept = 70.38, 
              linetype = "dashed", 
              color = "gray",
              size = 1) +
-   annotate("text",x=67 ,
+   annotate("text", x = 67,
            y = "Virginia" ,label = "National \nAverage",color = "gray30",size = 3, 
-           family="Courier", line = "gray", fontface="bold") +
+           family="Courier", line = "gray", fontface = "bold") +
   labs(title = "Relationship between Textbook Spending per Student and Language proficiency", 
-       x= "Percent of students at and above proficiency level",
-       y="",
-       size= "Spending on textbook per student",
-       color="",
-       legend= "") +
+       x = "Percent of students at and above proficiency level",
+       y = "",
+       size = "Spending on textbook per student",
+       color = "",
+       legend = "") + 
+  theme_minimal() + #Amy: Suggest theme_minimal
    theme(legend.position = "bottom",
         legend.direction = "horizontal",
         legend.key.size = unit(1, 'cm'),
         legend.key.height = unit(.5,"cm"), 
         plot.title = element_text(hjust = 0),
-        plot.title.position = "plot")
+        plot.title.position = "plot",
+        panel.grid.minor.y = element_blank(),
+        panel.grid.minor.x = element_blank()) #Amy: Suggest removing unnecessary axis grid lines
 
 cek  
 
 ```
 #### Variation in District Textbook Spending for each state
+
 ```{r eval=FALSE, include=FALSE}
 #Check the state with the highest proficiency level: Virginia 
 textbook_va <- all %>% 
@@ -633,7 +681,7 @@ va_book <- left_join(va, textbook_va,by = c("GEOID" = "leaid")) %>%
         legend.key.height = unit(.5,"cm")) +
   labs(fill = "Textbook funding per student")
 
-va_book
+va_book #Amy: This one wouldn't run for me
 ```
 ##### Example for West Virginia
  * Attaching the example plot as an image here because it requires specific setting to run. 
@@ -657,7 +705,7 @@ wv_book <- left_join(wv, textbook_wv,by = c("GEOID" = "leaid")) %>%
         legend.direction = "horizontal",
         legend.key.size = unit(1, 'cm'),
         legend.key.height = unit(.5,"cm")) +
-  labs(title= "Textbook spending per school district in the State of West Virginia",
+  labs(title = "Textbook spending per school district in the State of West Virginia",
          fill = "Textbook funding per student")
 
 wv_book
@@ -695,7 +743,7 @@ or_book
 
 
 
-```{r creating us plot, eval=FALSE, include=FALSE}
+```{r creating-us-plot, eval=FALSE, include=FALSE}
 # Spending on textbook perstudent across states
 #it takes too long to run - 
 
