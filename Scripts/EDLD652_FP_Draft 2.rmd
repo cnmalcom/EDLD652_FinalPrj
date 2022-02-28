@@ -1,0 +1,883 @@
+---
+title: "EDLD 652 Final Project Draft"
+author: 
+    - Cassie Malcom
+    - Merly Klaas
+    - Havi Khurana
+date: "2/21/2022"
+output: 
+  html_document:
+        toc: true
+        toc_float: true
+        toc_depth: 4
+        highlight: kate
+        code_folding: hide
+---
+
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE,
+                      error = FALSE,
+                      fig.width = 9, 
+                      fig.height = 9)
+```
+
+```{r load packages}
+pacman::p_load("tidyverse","rio","here","janitor", "usmap","maps", "colorspace","geofacet", "viridis","ggthemes","arrow", "forcats", "ggrepel", edld652, psych, dplyr, stringr, readr, tidyr, corrplot, Hmisc)
+```
+
+## RQ1
+
+**Student and Teacher ethnic distribution in K-12 public schools in the US**
+
+```{r rq1-subset-data, eval = FALSE}
+#We used "district-membership-17-21.parquet" file. Being too big, we created a subset of this data and stored it our local. Yet, this is how we cleaned the data
+dm <- read_parquet(here("district-membership-17-21.parquet"))
+
+dm_s <- dm %>% 
+  select(GRADE,LEAID,LEA_NAME,RACE_ETHNICITY,
+         SCHOOL_YEAR,SEX,ST,STATENAME, STUDENT_COUNT, YEAR) %>% 
+  filter(YEAR %in% c("2017","2018")) #some teacher-ethnicity data is for year 2017
+rm(dm) #freeing space
+
+unique(dm_s$GRADE)
+#"Grade 6"           "Grade 7"           "Grade 8"          
+#[4] "Grade 9"           "Kindergarten"      "Not Specified"    
+#[7] "Pre-Kindergarten"  "Ungraded"          "No Category Codes"
+#[10] "Grade 1"           "Grade 10"          "Grade 11"         
+#[13] "Grade 12"          "Grade 2"           "Grade 3"          
+#[16] "Grade 4"           "Grade 5"           "Adult Education"  
+#[19] "Grade 13"  
+
+#I'm making two subsets here. One which has only K12 student distribution by race and ethnincity, and another, which has the total number of students in the district (this is required for the next research question)
+
+#Student data for K12
+
+#Let's remove the other grade classes.
+
+dm_k12 <- subset(dm_s, grepl(("^G|^K"), GRADE))
+
+unique(dm_k12$GRADE) #We still have Grade 13, let's remove that
+
+dm_k12 <- dm_k12 %>% 
+    filter(GRADE != "Grade 13")
+
+export(dm_k12, here("data", "dm_k12.rda"))
+
+# Total students in district
+
+#"No Category Codes" is in the GRADE, RACE/ETHNICITY, and SEX categories. 
+#This comprises the sum of all the other groups at the category level. 
+#We checked this compaing the two values; it almost all cases this was equal. (for 3 million) 
+#In a handful of cases (<50), this was not equal when no grade-wise student ethnincity data was available.
+#We also want total students enrolled for each district irrespective of the grades. 
+#This information is coded in grade == "no category codes", race/ethnicity == "no category codes", and sex == "no category codes".
+
+dm_total <- dm_s %>% 
+  filter(YEAR == "2018",
+         GRADE == "No Category Codes",
+         RACE_ETHNICITY == "No Category Codes",
+         SEX == "No Category Codes") 
+
+#weird that each district is occuring two times. let's just keep one.
+
+dm_total <- dm_total %>% 
+  distinct()
+
+length(unique(dm_total$LEAID)) #this doesn't match our dm_total dimensions. 
+
+dm_total <- dm_total %>% 
+  distinct() %>% 
+  group_by(LEAID) %>% 
+  mutate(n=n()) #some districts have two rows
+ 
+#Some districts (44) have double reporting. 
+#Mostly in DC: On checking, one number points to 0 and another to a finite value. 
+#In all other cases (NV, OR, VT), both rows have very close values.
+#Let's keep the higher of the two.
+
+temp <- dm_total %>%
+  filter(n ==2) %>% 
+  slice(which.max(STUDENT_COUNT))
+
+#Let's join them
+
+dm_total <- dm_total %>% 
+  filter(n == 1) %>% 
+  rbind(temp)
+  
+#Now each district has a unique row, and there are no inconsistencies.
+
+#export it
+export(dm_total, here("data","dm_total.rda"))
+```
+
+```{r read-data-rq1}
+dm_k12 <- import(here("data","dm_k12.rda")) %>% 
+    clean_names()
+```
+
+
+```{r summary}
+#Let's pool student population by grades and gender into a single ethnic categories district membership summary
+
+dm_sum <- dm_k12 %>% 
+    group_by(st, leaid, race_ethnicity, year, statename) %>% 
+    summarise(
+        student = sum(student_count, na.rm = TRUE) #students belonging to one race 
+    ) %>% 
+    group_by(st, leaid, year) %>% 
+    mutate(
+        total = sum(student, na.rm = TRUE),
+        no_code = sum(if_else(race_ethnicity == "No Category Codes", student, 0)),
+        total_reported = total - no_code,
+        flag = ifelse(no_code == total_reported, TRUE, FALSE)
+    )
+
+```
+
+
+
+```{r flag_f, eval = FALSE}
+#quick check   
+dm_sum %>% 
+   group_by(flag) %>% 
+  summarise(
+      n = n()
+   )
+
+#315612 times no_code = total_reported. Only 45 times this is not the case.
+#This doesn't seem like a coincidence. It feels like students were double counted 
+#If this is true, total_reported would be the correct number of total students. 
+
+#Let's explore the FALSE situations
+flag_f <- dm_sum %>% 
+    filter(flag == FALSE)
+
+#this only happens in 5 districts (3 CA, 2 KS) for 2018 year where student by ethnicity data is not present
+#i.e., students in each sub-group is 0.
+
+#Next, let's exclude these false situations, and find percentage of each ethnic group for 2018 and leaid
+```
+
+
+```{r dm_2018}
+dm18_long <- dm_sum %>% 
+    filter(year == "2018" & flag != "FALSE" & !race_ethnicity %in% c("No Category Codes", "Not Specified")) %>% 
+    mutate(
+        percent_d = round((student/total_reported)*100, 3)
+    ) %>% 
+    select(leaid, race_ethnicity, student, percent_d, total_reported, everything())
+
+#data in wide format
+dm18_wide <- dm18_long %>% 
+    pivot_wider(
+        names_from = race_ethnicity,
+        values_from = c(student,percent_d)
+    )
+
+#rm(dm_k12,dm_sum)
+```
+
+### Prelim plots
+
+#### Plot 1: Faceted Bar Charts
+
+```{r plot_raw, fig.height= 10, fig.width= 10}
+dm18_long %>% 
+    group_by(st, race_ethnicity) %>% 
+    summarise(
+        stu_total = sum(student)
+    ) %>% 
+    ggplot(aes(x = race_ethnicity, y = stu_total))+
+    geom_col()+
+    coord_flip()+
+    facet_wrap(~st)
+
+#Some variation is seem, but most numbers are collapsed due to common x-axis.
+#trying log transformation and percentage
+```
+
+```{r plot_log, fig.height= 10, fig.width= 10}
+dm18_long %>% 
+    group_by(st, race_ethnicity) %>% 
+    summarise(
+        stu_total = sum(student)
+    ) %>% 
+    ggplot(aes(x = race_ethnicity, y = stu_total))+
+    geom_col()+
+    scale_y_log10()+
+    coord_flip()+
+    facet_wrap(~st)
+#Some variation, but still hard to make much sense due to log scale
+```
+
+```{r plot_percentage, fig.height= 10, fig.width= 10}
+dm18_long %>% 
+    group_by(st, race_ethnicity) %>% 
+    summarise(
+        stu_total = sum(student)
+    ) %>% 
+    group_by(st) %>% 
+    mutate(
+        total = sum(stu_total),
+        percent_s = round((stu_total*100/total),3)
+    ) %>% 
+    ggplot(aes(x = race_ethnicity, y = percent_s))+
+    geom_col()+
+    coord_flip()+
+    facet_wrap(~st)
+
+#this turned out well. 
+
+```
+
+#### Plot 2: Bar charts with different layout 
+
+
+```{r plot_geofacet, fig.height= 10, fig.width= 12}
+dm18_long %>% 
+    group_by(st, race_ethnicity) %>% 
+    summarise(
+        stu_total = sum(student)
+    ) %>% 
+    group_by(st) %>% 
+    mutate(
+        total = sum(stu_total),
+        percent_s = round((stu_total*100/total),3)
+    ) %>% 
+    ggplot(aes(x = race_ethnicity, 
+               y = percent_s, 
+               fill = race_ethnicity))+
+    geom_col(show.legend = FALSE)+
+    coord_flip()+
+    theme_bw() +
+    facet_geo(~ st, grid = "us_state_grid2")
+
+```
+
+#### Plot 3: Maps
+
+```{r prep_map_data}
+#Prep data for state (still can't figure out district mapping) in pivot_wider format
+
+sm_2018 <- dm18_long %>% 
+    group_by(st, statename, race_ethnicity) %>% 
+    summarise(
+        stu_total = sum(student)
+    ) %>% 
+    group_by(st) %>% 
+    mutate(
+        total = sum(stu_total),
+        percent_s = round((stu_total*100/total),3),
+        state = tolower(statename)
+    ) %>% 
+    pivot_wider(
+        names_from = race_ethnicity,
+        values_from = c(stu_total,percent_s)
+    ) 
+
+#check <- left_join(statepop, sm_2018, by = c("abbr" = "st")) %>% 
+ #   select(-pop_2015)
+```
+
+#### Plot 3: Geographic maps for student ethnic percentage
+
+```{r state_maps}
+race <- c("percent_s_White","percent_s_Black or African American", "percent_s_American Indian or Alaska Native","percent_s_Asian","percent_s_Hispanic/Latino","percent_s_Native Hawaiian or Other Pacific Islander")
+
+plots <- vector("list", length(race))
+
+
+for (i in seq_along(race)) {
+plots[[i]] <- plot_usmap(data = sm_2018, values = race[i], color = "gray")+
+    scale_fill_continuous_sequential(palette = "Red-Purple") +
+    labs(
+        title = paste0("Distribution of ", race[i]," students")
+        )
+print(plots[[i]])
+}
+```
+
+
+```{r plot_together}
+us_states <- map_data("state")
+
+sm18_long <- dm18_long %>% 
+    group_by(st, statename, race_ethnicity) %>% 
+    summarise(
+        stu_total = sum(student)
+    ) %>% 
+    group_by(st) %>% 
+    mutate(
+        total = sum(stu_total),
+        percent_s = round((stu_total*100/total),3)
+    ) %>%  
+    filter(!st %in% c("BI","AS","GU","PR","VI"))
+
+sm18_long$region <- tolower(sm18_long$statename)
+stueth_map <- left_join(us_states, sm18_long)
+
+ggplot(data = stueth_map,
+             mapping = aes(x = long, y = lat,
+                 group = group,
+                 fill = percent_s))+ 
+    geom_polygon(color = "gray90", size = 0.05) +
+    coord_map(projection = "albers", lat0 = 39, lat1 = 45) +
+    scale_fill_continuous_sequential(palette = "Reds 3") +
+    theme_map() + facet_wrap(~ race_ethnicity, ncol = 3) +
+    theme(legend.position = "bottom",
+          strip.background = element_blank()) 
+```
+
+```{r plot_together_2}
+ggplot(data = subset(stueth_map, race_ethnicity != "White"),
+             mapping = aes(x = long, y = lat,
+                 group = group,
+                 fill = percent_s))+
+    geom_polygon(color = "gray90", size = 0.05) +
+    coord_map(projection = "albers", lat0 = 39, lat1 = 45) +
+    scale_fill_viridis_c(option = "magma")+
+    theme_map() + facet_wrap(~ race_ethnicity, ncol = 3) +
+    theme(legend.position = "bottom",
+          strip.background = element_blank()) 
+```
+
+
+```{r plot_together_3}
+sm18_long %>% 
+    mutate(
+        rbinary = ifelse(race_ethnicity == "White", "White","Students of Color")
+    ) %>%
+    group_by(region, rbinary) %>% 
+    summarise(
+        percent_b = sum(percent_s)
+    ) %>% 
+    right_join(us_states) %>% 
+    ggplot(mapping = aes(x = long, y = lat,
+                 group = group,
+                 fill = percent_b))+
+    geom_polygon(color = "gray90", size = 0.05) +
+    coord_map(projection = "albers", lat0 = 39, lat1 = 45)+
+    scale_fill_viridis_c(option = "magma")+
+    theme_map() + facet_wrap(~ rbinary, ncol = 2) +
+    theme(legend.position = "bottom",
+          strip.background = element_blank())
+```
+
+
+```{r plot_together_log}
+#also trying logarithmic scale for raw counts of student ethnicity
+ggplot(data = stueth_map,
+             mapping = aes(x = long, y = lat,
+                 group = group,
+                 fill = stu_total))+ 
+    geom_polygon(color = "gray90", size = 0.05) +
+    coord_map(projection = "albers", lat0 = 39, lat1 = 45) +
+    scale_fill_viridis_c(option = "magma",
+                         trans = "log",
+                         labels = scales::comma)+
+    theme_map() + facet_wrap(~ race_ethnicity, ncol = 3) +
+    theme(strip.background = element_blank(),
+          legend.direction = "vertical") 
+```
+
+
+## Research Question 2
+### 2a.  How does the the proficiently level in language and math vary across state for High School Students? How does it differ by students characteristics such as race/ethnicity, English Learner status, Student with Disability, Low Income students?
+
+
+
+```{r load data}
+
+#rla_sc <- get_data("EDFacts_rla_achievement_sch_2010_2019")
+rla_sc <- import(here("Data", "rla_sc.csv"))  #rla_sc file is included in gitignore. 
+fis08 <- import(here("Data","fis08.csv"))
+math_sc <- import(here("Data", "math_sc.csv"))
+enroll <- import(here("Data", "dm_total.rda"))
+#member_sc <- import(here("Data", "school-membership-17-21.parquet"))
+#member_ds <- import(here("Data", "district-membership-17-21.parquet"))
+#rla_sc <- import(here("Data", "rla_sc.csv")) file is too big, I can't push it to github
+
+```
+
+
+```{r select relevant variable}
+math_sc <- math_sc %>% 
+  select(LEAID, STNAM, NCESSCH, ALL_MTHHSPCTPROF, MAM_MTHHSPCTPROF, MAS_MTHHSPCTPROF, MBL_MTHHSPCTPROF, MHI_MTHHSPCTPROF, MTR_MTHHSPCTPROF, MWH_MTHHSPCTPROF, CWD_MTHHSPCTPROF, ECD_MTHHSPCTPROF, LEP_MTHHSPCTPROF,HOM_MTHHSPCTPROF)  %>% 
+  clean_names() %>% 
+  pivot_longer(cols= ends_with("prof"), 
+              names_to = "identity", 
+              values_to = "math_pctabove",
+              names_pattern = "(.*)_mthhspctprof")
+
+math_sc$math_pctabove <- sub(".*-(.*)", "\\1", math_sc$math_pctabove) 
+math_sc$math_pctabove <- as.numeric(math_sc$math_pctabove)
+math_sc$leaid <- as.character(math_sc$leaid)
+math_sc$ncessch <- as.character(math_sc$ncessch)
+  
+  
+rla_sc <- rla_sc %>% 
+   select(LEAID,STNAM, NCESSCH, ALL_RLAHSPCTPROF, MAM_RLAHSPCTPROF, MAS_RLAHSPCTPROF, MBL_RLAHSPCTPROF, MHI_RLAHSPCTPROF, MTR_RLAHSPCTPROF, MWH_RLAHSPCTPROF, CWD_RLAHSPCTPROF, ECD_RLAHSPCTPROF, LEP_RLAHSPCTPROF, HOM_RLAHSPCTPROF)  %>%  
+  clean_names() %>% 
+  pivot_longer(cols= ends_with("prof"), 
+              names_to = "identity", 
+              values_to = "rla_pctabove",
+              names_pattern = "(.*)_rlahspctprof")
+rla_sc$rla_pctabove <- sub(".*-(.*)", "\\1", rla_sc$rla_pctabove) 
+rla_sc$rla_pctabove <- as.numeric(rla_sc$rla_pctabove)
+
+
+fis08 <- fis08 %>% 
+  select(LEAID, "textbook"= V93, TOTALEXP, "instruction"= TCURINST , "supservice" = TCURSSVC ) %>% 
+  clean_names()
+
+
+```
+
+```{r join rla-math}
+all <- left_join(rla_sc, math_sc) %>% 
+  left_join(fis08) 
+
+enroll <- enroll %>% 
+  select(LEAID, LEA_NAME, STUDENT_COUNT)%>% 
+  clean_names() 
+
+
+
+all<- left_join(all,enroll) %>% 
+  mutate(perstudbook = (textbook/student_count),
+         stnam = stringr::str_to_title(stnam)) %>% 
+  filter_all(all_vars(!is.infinite(.))) %>% 
+  filter(!stnam == "Stnam")
+
+
+```
+
+Plots to compare students proficiency level across states and how it differs based on students' characteristics. 
+
+```{r plots}
+#Planning to have interactive plots with all student as gray background and other characteristics with color on top of the gray bar. 
+#all students 
+all %>% 
+  filter(identity == "all") %>% 
+  group_by(stnam) %>% 
+  summarise(meanmath = mean(math_pctabove, na.rm = TRUE), 
+            meanrla = mean(rla_pctabove, na.rm=TRUE)) %>% 
+    ggplot()+
+   geom_col(aes(meanrla, fct_reorder(stnam, meanrla)), fill = "grey80") + 
+    scale_x_continuous(expand = c(0,0),
+                        limits = c(0,100) )
+
+#proficiency level for english language learner
+all %>% 
+  filter(identity == "lep") %>%
+  group_by(stnam) %>% 
+  summarise(meanmath = mean(math_pctabove, na.rm = TRUE), 
+            meanrla = mean(rla_pctabove, na.rm=TRUE)) %>% 
+  ggplot()+
+  geom_col(aes(meanrla, stnam), fill = "#EEC77E")+
+  scale_x_continuous(expand = c(0,0), 
+                     limits = c(0,100))+ 
+  labs(title = "Percentage of students at and above RLA proficiency across states",
+       subtitle = "All High School Students Category",
+         y = "",
+       x= "Percent of students at and above RLA proficiency")
+                 
+  
+#proficiency level for children with disability
+all %>% 
+  filter(identity == "cwd") %>% 
+  group_by(stnam) %>% 
+  summarise(meanmath = mean(math_pctabove, na.rm = TRUE), 
+            meanrla = mean(rla_pctabove, na.rm=TRUE)) %>% 
+  ggplot()+
+  geom_col(aes(meanrla, stnam), fill = "#A1D2F1")+
+  scale_x_continuous(expand = c(0,0), 
+                     limits = c(0,100))+
+    labs(title = "Percentage of students at and above RLA proficiency across states",
+       subtitle = "Students with disabililty category",
+         y = "",
+       x= "Percent of students at and above RLA proficiency")
+
+
+#proficiency level for Economically disadvantaged students
+all %>% 
+  filter(identity == "ecd") %>% 
+  group_by(stnam) %>% 
+  summarise(meanmath = mean(math_pctabove, na.rm = TRUE), 
+            meanrla = mean(rla_pctabove, na.rm=TRUE)) %>% 
+  ggplot()+
+  geom_col(aes(meanrla, stnam), fill = "#F1A8A1")+
+  scale_x_continuous(expand = c(0,0), 
+                     limits = c(0,100)) +
+  labs(title = "Percentage of High School students at and above RLA proficiency across states",
+       subtitle = "Low-Income Students Category",
+         y = "",
+       x= "Percent of students at and above RLA proficiency")
+
+
+```
+
+### 2b. What is the relationship between district spending on textbook and students proficiency level? 
+```{r}
+#State level data
+state_textbook <- all %>%
+  select(stnam, textbook, student_count) %>% 
+  distinct(stnam, textbook, student_count) %>% 
+  drop_na() %>% 
+  group_by(stnam) %>% 
+  summarise(state_per_student = sum(textbook)/sum(student_count)) 
+
+
+state_pct<- all %>% 
+  filter(identity == "all") %>% 
+  group_by(stnam) %>% 
+  summarise(meanmath = mean(math_pctabove, na.rm = TRUE), 
+            meanrla = mean(rla_pctabove, na.rm=TRUE))
+
+state_joined<-left_join(state_textbook, state_pct)
+```
+
+
+```{r}
+state_textbook  %>% 
+  ggplot()+
+  geom_col(aes(state_per_student, fct_reorder(stnam, state_per_student)), fill = "#A1D2F1")+
+  scale_x_continuous(expand = c(0,0), 
+                     limits = c(0,110)) +
+  labs( x = "Textbook spending per student")
+
+state_joined%>% 
+  filter(!state_per_student <0,
+         !stnam == "North Dakota",
+         !stnam == "Alaska") %>% #drop state with missing values
+  ggplot(aes(state_per_student, meanmath))+
+  geom_point() +
+  geom_smooth(method = "lm")+
+  geom_text_repel(aes(label = stnam))+
+  scale_x_continuous(expand = c(0,0)) +
+  labs(title= "Textbook Spending & RLA Achievement",
+      x = "Textbook spending per student", 
+       y = "Percent of Students at Proficiency Level")
+
+
+state_joined%>% 
+  filter(!state_per_student <0,
+         !stnam == "North Dakota",
+         !stnam == "Alaska") %>% #drop state with missing values
+  ggplot(aes(state_per_student, meanmath))+
+  geom_point() +
+  geom_smooth(method = "lm")+
+  geom_text_repel(aes(label = stnam))+
+  scale_x_continuous(expand = c(0,0)) +
+    labs(title= "Textbook Spending & Math Achievement",
+      x = "Textbook spending per student", 
+       y = "Percent of Students at Proficiency Level")
+```
+
+
+```{r}
+cek <- all %>% 
+  filter(identity == "all") %>% 
+  group_by(stnam) %>% 
+  mutate(meanmath = mean(math_pctabove, na.rm = TRUE), 
+            meanrla = mean(rla_pctabove, na.rm=TRUE),
+         low = ifelse(meanrla<=70.38, TRUE, FALSE)) %>% 
+  ggplot(aes(meanrla, stnam)) +
+  geom_point(aes(size = perstudbook, color = low))+
+  geom_vline(xintercept=70.38, 
+             linetype = "dashed", 
+             color = "gray",
+             size = 1) +
+   annotate("text",x=67 ,
+           y = "Virginia" ,label = "National \nAverage",color = "gray30",size = 3, 
+           family="Courier", line = "gray", fontface="bold") +
+  labs(title = "Relationship between Textbook Spending per Student and Language proficiency", 
+       x= "Percent of students at and above proficiency level",
+       y="",
+       size= "Spending on textbook per student",
+       color="",
+       legend= "") +
+   theme(legend.position = "bottom",
+        legend.direction = "horizontal",
+        legend.key.size = unit(1, 'cm'),
+        legend.key.height = unit(.5,"cm"), 
+        plot.title = element_text(hjust = 0),
+        plot.title.position = "plot")
+
+cek  
+
+```
+
+```{r}
+#Check the state with the highest proficiency level: Virginia 
+textbook_va <- all %>% 
+  filter(stnam == "Virginia")
+  
+
+va <- lea_get(state = "va") %>% 
+    sf::st_as_sf() 
+
+va_book <- left_join(va, textbook_va,by = c("GEOID" = "leaid")) %>% 
+  ggplot() +
+  geom_sf(aes(fill = perstudbook), size = 0.1) +
+  scale_fill_continuous_divergingx(palette = "Earth",  labels = scales::dollar) +
+  theme(legend.position = "bottom",
+        legend.direction = "horizontal",
+        legend.key.size = unit(1, 'cm'),
+        legend.key.height = unit(.5,"cm")) +
+  labs(fill = "Textbook funding per student")
+
+va_book
+```
+
+
+```{r}
+#Check the state with the lowest proficiency level: West Virginia 
+textbook_wv <- all %>% 
+  filter(stnam == "West Virginia")
+  
+
+wv <- lea_get(state = "wv") %>% 
+    sf::st_as_sf() 
+
+wv_book <- left_join(wv, textbook_wv,by = c("GEOID" = "leaid")) %>% 
+  ggplot() +
+  geom_sf(aes(fill = perstudbook), size = 0.1) +
+  scale_fill_continuous_divergingx(palette = "Earth",  labels = scales::dollar) +
+  theme(legend.position = "bottom",
+        legend.direction = "horizontal",
+        legend.key.size = unit(1, 'cm'),
+        legend.key.height = unit(.5,"cm")) +
+  labs(fill = "Textbook funding per student")
+
+wv_book
+
+```
+
+
+
+
+Visualizing textbook spending for school district in Oregon as an example: 
+```{r oregon-textbookplot}
+#  Oregon 
+textbook_or <- all %>% 
+  filter(stnam == "Oregon")
+  
+
+or <- lea_get(state = "or") %>% 
+    sf::st_as_sf() 
+
+or_book <- left_join(or, textbook_or,by = c("GEOID" = "leaid")) %>% 
+  ggplot() +
+  geom_sf(aes(fill = perstudbook), size = 0.1) +
+  scale_fill_continuous_divergingx(palette = "Earth",  labels = scales::dollar) +
+  theme(legend.position = "bottom",
+        legend.direction = "horizontal",
+        legend.key.size = unit(1, 'cm'),
+        legend.key.height = unit(.5,"cm")) +
+  labs(fill = "Textbook funding per student")
+
+or_book
+```
+
+
+
+```{r creating us plot, eval=FALSE, include=FALSE}
+# Spending on textbook perstudent across states
+#it takes too long to run - 
+
+
+us <- lea_get() %>% 
+    sf::st_as_sf() 
+
+fips <- readr::read_csv("https://github.com/kjhealy/fips-codes/raw/master/state_fips_master.csv")
+
+states <- fips$state_name
+
+us %>% 
+  dplyr::rename(fips = STATEFP,
+                leaid = GEOID) %>% 
+  dplyr::mutate(fips = readr::parse_number(fips)) %>% 
+  dplyr::right_join(fips) %>% 
+  right_join(all) %>% 
+  dplyr::filter(state_name %in% states[!states %in% c("Alaska", "Hawaii")]) %>% 
+  ggplot2::ggplot() +
+  geom_sf(aes(fill = perstudbook ), size = 0.1) +
+  scale_fill_continuous_divergingx(palette = "Earth",  labels = scales::dollar) +
+  theme(legend.position = "bottom",
+        legend.direction = "horizontal",
+        legend.key.size = unit(1, 'cm'),
+        legend.key.height = unit(.5,"cm")) +
+  labs(fill = "Textbook funding per student")
+
+
+
+```
+
+***Research Question 3
+```{r calldata, echo=FALSE, eval=FALSE, results='hide'}
+ethnic <- get_data("NCES_CCD_nonfiscal_school_2019_membership")
+
+ethnic
+```
+
+```{r ethnic2, echo=FALSE, eval=FALSE, results='hide'}
+e2 <- ethnic %>%
+  filter(!is.na(STUDENT_COUNT))
+
+e2
+```
+
+```{r ethnic3, echo=FALSE, eval=FALSE, results='hide'}
+e3 <- e2 %>%
+  filter((GRADE=="Grade 9")|(GRADE=="Grade 10")|(GRADE=="Grade 11")|(GRADE=="Grade 12")|(str_detect(SCH_NAME, "High")))
+
+e3
+```
+
+```{r checknames, echo=FALSE, eval=FALSE, results='hide'}
+colnames(e3)
+```
+
+```{r ehtnic4, echo=FALSE, eval=FALSE, results='hide'}
+e4 <- e3 %>%
+  select(LEAID, GRADE, SCH_NAME, SCHOOL_YEAR, RACE_ETHNICITY, SEX, STUDENT_COUNT, ST)
+
+e4
+```
+
+```{r ethnic5, echo=FALSE, eval=FALSE, results='hide'}
+e5 <- e4 %>%
+  group_by(LEAID, RACE_ETHNICITY) %>%
+  summarize(student = sum(STUDENT_COUNT))
+
+e5
+```
+Filter out the "no category codes" and "not specified", "two or more races"
+```{r ethnic6, echo=FALSE, eval=FALSE, results='hide'}
+e6 <- e5 %>%
+  filter(RACE_ETHNICITY!="Not Specified" & RACE_ETHNICITY!="No Category Codes" & RACE_ETHNICITY!="Two or more races")
+
+e6
+```
+
+```{r savec, echo=FALSE, eval=FALSE, results='hide'}
+# write.csv(e6, "ethnicity.csv")
+```
+
+```{r calldata2, echo=FALSE, results='hide'}
+ed <- read.csv("/Users/cassiemalcom/Desktop/CM2020/22_Winter Term Classes/EDLD 652_DS2/EDLD652_FinalPrj/Data/ethnicity.csv")
+
+ed
+```
+
+```{r ethnicdata2, echo=FALSE, results='hide'}
+ed2 <- ed %>%
+  select(c(2,3,4))
+
+ed2
+```
+
+```{r ethnicdata3, echo=FALSE, results='hide'}
+ed3 <- ed2 %>%
+  group_by(LEAID) %>%
+  mutate(total = sum(student))
+
+ed3
+```
+
+Need to get all minorities into one sum. Pivot?
+```{r ethnicdata3, echo=FALSE, results='hide'}
+ed4 <- ed3 %>%
+  pivot_wider(names_from = RACE_ETHNICITY, values_from = student)
+
+ed4
+```
+
+How to get a table like this to scroll on knitting to HTML?
+```{r minorities, echo=FALSE, results='hide'}
+ed4$minority <- rowSums(ed4[ , c(3,4,5,6,7)], na.rm=TRUE)
+
+ed4
+```
+
+```{r percentages, echo=FALSE, results='hide'}
+ed5 <- ed4 %>%
+  mutate(percentW = round(White/total*100, digits = 2), percentM = round(minority/total*100, digits = 2))
+
+ed5
+```
+
+```{r textbkdata, echo=FALSE, results='hide'}
+tbd <- get_data("NCES_CCD_fiscal_district_2018")
+
+tbd
+```
+
+```{r tbd2, echo=FALSE, results='hide'}
+tbd2 <- tbd %>%
+  select(LEAID, V33, V93, STABBR)
+
+tbd2
+```
+
+```{r tbd3, echo=FALSE, results='hide'}
+ tbd3 <- tbd2 %>%
+  filter(V93 >= 0)
+
+tbd3
+```
+
+```{r tbd3convert, echo=FALSE, results='hide'}
+tbd3$LEAID <- as.numeric(as.character(tbd3$LEAID))
+
+tbd3
+```
+
+
+```{r tbd4join, echo=FALSE, results='hide'}
+tbd4 <- left_join(ed5, tbd3, by = "LEAID")
+
+tbd4
+```
+
+```{r p1, echo=FALSE}
+p1 <- tbd4 %>%
+  ggplot(aes(V93, percentM)) +
+  geom_point()
+
+p1
+```
+
+```{r p2, echo=FALSE}
+p2 <- tbd4 %>%
+  ggplot(aes(V93, percentW)) +
+  geom_point()
+
+p2
+```
+
+```{r}
+tbd5 <- tbd4 %>%
+  select(total, V93, percentM, percentW)
+
+tbd5
+```
+
+Could not get these results to plot via corrplot. I don't see any significant correlation though so this might not be a RQ that we want to continue with.
+```{r}
+mycorr <- rcorr(as.matrix(tbd5))
+
+mycorr
+```
+
+
+
+
+
+
+
+
