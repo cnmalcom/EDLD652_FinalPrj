@@ -207,7 +207,8 @@ dm18_long %>%
     ) %>% 
     ggplot(aes(x = race_ethnicity, y = stu_total))+
     geom_col()+
-    scale_y_log10()+
+#tried changing the labels to make it clearer from the graph that we're working in Log scale now, did not work super well...
+      scale_y_log10(labels = scales::comma)+
     coord_flip()+
     facet_wrap(~st)
 #Some variation, but still hard to make much sense due to log scale
