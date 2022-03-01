@@ -251,7 +251,7 @@ dm18_long %>%
         total = sum(stu_total),
         percent_s = round((stu_total*100/total),3)
     ) %>% 
-    ggplot(aes(x = race_ethnicity, 
+    ggplot(aes(x = fct_reorder(race_ethnicity, percent_s), 
                y = percent_s, 
                fill = race_ethnicity))+
     geom_col(show.legend = FALSE)+
@@ -259,6 +259,7 @@ dm18_long %>%
     theme_bw() +
     facet_geo(~ st, grid = "us_state_grid2")
 
+#RG wow I really liked how this turned out! I added reorder so that the race/ethnicity would be ordered by percent
 ```
 
 #### Plot 3: Maps
@@ -523,6 +524,7 @@ all %>%
          y = "",
        x= "Percent of students at and above RLA proficiency")
 
+# RG I liked the use of color for these but I am wondering if there is a way to facet them together so that you can compare the differences by subgroup
 
 ```
 
@@ -581,6 +583,8 @@ state_joined%>%
     labs(title= "Textbook Spending & Math Achievement",
       x = "Textbook spending per student", 
        y = "Percent of Students at Proficiency Level")
+
+#These are very informative, could you annotate certain states with $ amounts for added context?
 ```
 
 #### Relationship between Textbook Spending per Student and Language proficiency Across the States
@@ -601,10 +605,10 @@ cek <- all %>%
    annotate("text",x=67 ,
            y = "Virginia" ,label = "National \nAverage",color = "gray30",size = 3, 
            family="Courier", line = "gray", fontface="bold") +
-  labs(title = "Relationship between Textbook Spending per Student and Language proficiency", 
+  labs(title = "Relationship between Textbook Spending per Student and Reading proficiency", 
        x= "Percent of students at and above proficiency level",
        y="",
-       size= "Spending on textbook per student",
+       size= "Spending on textbook per student (dollars)",
        color="",
        legend= "") +
    theme(legend.position = "bottom",
@@ -612,10 +616,13 @@ cek <- all %>%
         legend.key.size = unit(1, 'cm'),
         legend.key.height = unit(.5,"cm"), 
         plot.title = element_text(hjust = 0),
-        plot.title.position = "plot")
+        plot.title.position = "plot") 
 
 cek  
 
+#RG I added text to show that the size of the circles represent dollars.
+
+#RG The size of the circles don't vary much. It might make more sense to have per student book as color instead of differentiating low vs. high
 ```
 #### Variation in District Textbook Spending for each state
 ```{r eval=FALSE, include=FALSE}
@@ -638,6 +645,8 @@ va_book <- left_join(va, textbook_va,by = c("GEOID" = "leaid")) %>%
   labs(fill = "Textbook funding per student")
 
 va_book
+
+#RG Might be interesting to compare what books cost in each state to see if the cost is inflated due to cost.
 ```
 ##### Example for West Virginia
  * Attaching the example plot as an image here because it requires specific setting to run. 
@@ -695,6 +704,8 @@ or_book <- left_join(or, textbook_or,by = c("GEOID" = "leaid")) %>%
        title= "Textbook spending per school district in the State of Oregon")
 
 or_book
+
+#RG could you annotate cities with higher textbook funding vs. lower?
 ```
 
 
