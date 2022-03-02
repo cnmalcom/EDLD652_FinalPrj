@@ -30,7 +30,7 @@ knitr::opts_chunk$set(echo = TRUE,
 <<<<<<< HEAD
 pacman::p_load("tidyverse","rio","here","janitor", "usmap","maps", "colorspace","geofacet", "viridis","ggthemes","arrow", "forcats", "ggrepel", edld652, psych, dplyr, stringr, readr, tidyr, corrplot, Hmisc)
 =======
-pacman::p_load("tidyverse","rio","here","janitor", "usmap","maps", "colorspace","geofacet","leaidr", "viridis","ggthemes","arrow", "forcats", "ggrepel","edld652", "mapproj","albersusa" )
+pacman::p_load("tidyverse","rio","here","janitor", "usmap","maps", "colorspace","geofacet","leaidr", "viridis","ggthemes","arrow", "forcats", "ggrepel","edld652", "mapproj","albersusa" , "cowplot")
 >>>>>>> main
 ```
 
@@ -570,18 +570,37 @@ r2a %>%
 
 
 ```
-
-
-
 ```{r}
-p.all_cwd <- r2a %>% 
-  ggplot() + 
-  geom_bar(aes(allmath, stnam), stat = "identity", fill = "gray80") + 
-  geom_col(aes(cwd, stnam), fill = "#EEC77E")
-p.all_cwd 
+library(albersusa)
 
+us <- usa_sf()
+us$name <- stringr::str_to_upper(us$name)
+join <- left_join(r2a, us, by = c("stnam"= "name"))
 
+a <- ggplot(join) +
+  geom_sf(aes(geometry = geometry, fill = allrla))+ 
+  scale_fill_continuous_divergingx(palette = "Earth",  labels = scales::comma)+
+  theme_void()
+
+b <- ggplot(join) +
+  geom_sf(aes(geometry = geometry, fill = cwdrla))+ 
+  scale_fill_continuous_divergingx(palette = "Earth",  labels = scales::comma)+
+  theme_void()
+
+c <- ggplot(join) +
+  geom_sf(aes(geometry = geometry, fill = ecdrla))+ 
+  scale_fill_continuous_divergingx(palette = "Earth",  labels = scales::comma)+
+  theme_void()
+
+d <- ggplot(join) +
+  geom_sf(aes(geometry = geometry, fill = leprla))+ 
+  scale_fill_continuous_divergingx(palette = "Earth",  labels = scales::comma) +
+  theme_void()
+
+plot_grid(a, b, c, d)
 ```
+
+
 
 
 ### 2b. What is the relationship between district spending on textbook and students proficiency level? 
@@ -728,6 +747,7 @@ ggplot(aes(x = allrla, y = reorder(stnam, allrla))) +
         legend.direction = "horizontal",
         legend.key.size = unit(1, 'cm'),
         legend.key.height = unit(.5,"cm"),
+        axis.text.y = element_text(size=7),
         plot.title.position = "plot", # easiest way to left align title
         plot.caption = element_text(hjust = 0.5, size = 12),
         panel.grid.major.y = element_blank(),
@@ -741,6 +761,7 @@ ggplot(aes(x = allrla, y = reorder(stnam, allrla))) +
 
 
 state_r2b %>% 
+  drop_na() %>% 
 ggplot(aes(x = allmath, y = reorder(stnam, allmath))) +
   geom_errorbar(aes(xmin = ifelse(allmath + qnorm(.025)*allmath_se<0,0,allrla + qnorm(.025)*allmath_se),
                     xmax = allmath + qnorm(.975)*allmath_se,
@@ -759,6 +780,7 @@ ggplot(aes(x = allmath, y = reorder(stnam, allmath))) +
         legend.direction = "horizontal",
         legend.key.size = unit(1, 'cm'),
         legend.key.height = unit(.5,"cm"),
+        axis.text.y = element_text(size=7),
         plot.title.position = "plot", # easiest way to left align title
         plot.caption = element_text(hjust = 0.5, size = 12),
         panel.grid.major.y = element_blank(),
@@ -786,7 +808,7 @@ va_book <- left_join(va, book_va,by = c("GEOID" = "leaid")) %>%
   ggplot() +
   geom_sf(aes(fill = perstudbook), size = 0.1) +
   scale_fill_continuous_divergingx(palette = "Earth",  labels = scales::dollar) +
-  theme_minimal()+
+  theme_void()+
   theme(legend.position = "bottom",
         legend.direction = "horizontal",
         legend.key.size = unit(1, 'cm'),
@@ -814,7 +836,7 @@ wv_book <- left_join(wv, textbook_wv,by = c("GEOID" = "leaid")) %>%
   geom_sf(aes(fill = perstudbook), size = 0.1) +
   theme_minimal()+
   scale_fill_continuous_divergingx(palette = "Earth",  labels = scales::dollar) +
-  theme_minimal()+
+  theme_void()+
   theme(legend.position = "bottom",
         legend.direction = "horizontal",
         legend.key.size = unit(1, 'cm'),
@@ -845,6 +867,7 @@ or_book <- left_join(or, textbook_or,by = c("GEOID" = "leaid")) %>%
   ggplot() +
   geom_sf(aes(fill = perstudbook), size = 0.1) +
   scale_fill_continuous_divergingx(palette = "Earth",  labels = scales::dollar) +
+  theme_void()+
   theme(legend.position = "bottom",
         legend.direction = "horizontal",
         legend.key.size = unit(1, 'cm'),
@@ -859,33 +882,19 @@ or_book
 
 ```{r creating us plot, eval=FALSE, include=FALSE}
 # Spending on textbook perstudent across states
-#it takes too long to run - 
 
 
 us <- lea_get() %>% 
     sf::st_as_sf() 
-
-fips <- readr::read_csv("https://github.com/kjhealy/fips-codes/raw/master/state_fips_master.csv")
-
-states <- fips$state_name
-
-us %>% 
-  dplyr::rename(fips = STATEFP,
-                leaid = GEOID) %>% 
-  dplyr::mutate(fips = readr::parse_number(fips)) %>% 
-  dplyr::right_join(fips) %>% 
-  right_join(all) %>% 
-  dplyr::filter(state_name %in% states[!states %in% c("Alaska", "Hawaii")]) %>% 
-  ggplot2::ggplot() +
-  geom_sf(aes(fill = perstudbook ), size = 0.1) +
+us_map <- left_join(state_r2b, us, by=c("GEOID" = "leaid") %>% 
+  ggplot() +
+  geom_sf(aes(fill = perstudbook), size = 0.1) +
   scale_fill_continuous_divergingx(palette = "Earth",  labels = scales::dollar) +
   theme(legend.position = "bottom",
         legend.direction = "horizontal",
         legend.key.size = unit(1, 'cm'),
-        legend.key.height = unit(.5,"cm")) +
-  labs(fill = "Textbook funding per student")
-
-
+        legend.key.height = unit(.5,"cm")) 
+us_map
 
 ```
 
