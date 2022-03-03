@@ -15,7 +15,7 @@ library(pacman)
 ```
 
 ```{r load-pkgs, echo=FALSE}
-pacman::p_load(edld652, tidyverse, psych, rio, here, forcats, arrow, dplyr, stringr, readr, tidyr, corrplot, Hmisc, scales, RColorBrewer, ggmap, devtools, leaidr, piggyback, mapproj, maptools, gitcreds, virdis, knitr, kableExtra, xtable, PerformanceAnalytics)
+pacman::p_load(edld652, tidyverse, psych, rio, here, forcats, arrow, dplyr, stringr, readr, tidyr, corrplot, Hmisc, scales, RColorBrewer, ggmap, devtools, leaidr, piggyback, mapproj, maptools, gitcreds, viridis, knitr, kableExtra, xtable, PerformanceAnalytics)
 ```
 
 ```{r calldata2, echo=FALSE, results='hide'}
@@ -176,7 +176,7 @@ tbd_f4
 ```
 
 Initial draft of p1
-```{r p0, echo=FALSE}
+```{r p0, echo=FALSE, dev='jpeg'}
 p0 <- tbd_f4 %>%
   ggplot(aes(x = textbk_exp_per_student, y = percentM)) +
   geom_point()
@@ -185,7 +185,7 @@ p0
 ```
 
 
-```{r p1, echo=FALSE}
+```{r p1, echo=FALSE, dev='jpeg'}
 p1 <- tbd_f4 %>%
   ggplot(aes(x = textbk_exp_per_student, y = percentM)) +
   geom_point(aes(color = textbk_exp_per_student), size=1) +
@@ -201,7 +201,7 @@ p1
 ```
 
 Showing p1 should be sufficient as p2 doesn't offer any new information.
-```{r p2, echo=FALSE}
+```{r p2, echo=FALSE, dev='jpeg'}
 p2 <- tbd_f4 %>%
   ggplot(aes(x = textbk_exp_per_student, y = percentW)) +
   geom_point(aes(color = textbk_exp_per_student), size=1) +
@@ -266,11 +266,11 @@ myXT <- xtable(corstarsl(tbd_corr[,2:5]))
 names(myXT) <- c("Total Number of Students per District", "Textbook Expenditure per Student", "Percent of Student Population Identifying as Minority", "Percent of Student Population Identifying as White")
 ```
 
-```{r corr5, echo=FALSE}
+```{r corr5, echo=FALSE, dev='jpeg'}
 print(xtable(myXT, caption = "Correlation Table for Textbook Expenditure"), caption.placement = 'top')
 ```
 
-```{r corr6, echo=FALSE}
+```{r corr6, echo=FALSE, dev='jpeg'}
 corrplot(cor(tbd_corr), method = 'ellipse', type = 'lower', addCoef.col = "black",    # Change font size of correlation coefficients
          number.cex = 0.5, col = COL2('PRGn', 10))
 
@@ -279,7 +279,7 @@ corrplot(cor(tbd_corr), method = 'ellipse', type = 'lower', addCoef.col = "black
 
 
 Correlation Matrix - how to change colors, labels, font size?
-```{r corr7, echo=FALSE}
+```{r corr7, echo=FALSE, dev='jpeg'}
 chart.Correlation(tbd_corr[,2:5], title = "Textbook Expenditure Correlation Matrix")
 ```
 
@@ -304,12 +304,12 @@ tbd_OR <- tbd_f4 %>%
 tbd_OR
 ```
 
-```{r OR2, echo=FALSE, results='hide'}
+```{r OR2, eval=FALSE, echo=FALSE, results='hide'}
 or <-
   lea_get("or")
 ```
 
-```{r OR3, echo=FALSE}
+```{r OR3, eval=FALSE, echo=FALSE, dev='jpeg'}
 or %>% 
   sf::st_as_sf() %>% 
   ggplot2::ggplot() +
@@ -321,33 +321,33 @@ or %>%
 ```
 
 This code was just to check if GEOID, LEAID, and NCES ID variables are the same number, which they are. 
-```{r findGEOID, echo=FALSE, results='hide'}
+```{r findGEOID, eval=FALSE, echo=FALSE, results='hide'}
 ca_data <-
   read_csv("https://raw.githubusercontent.com/making-data-science-count/covidedu/master/output/2020-04-29/summary-of-table-of-links.csv")
 
 str(ca_data)
 ```
 
-Try left_join instead of merge
-```{r ORmerge, echo=FALSE, results='hide'}
+```{r ORmerge, eval=FALSE, echo=FALSE, results='hide'}
 or_merge <-
   sp::merge(or, tbd_OR, by.x = "GEOID", by.y = "LEAID")
 
 or_merge
 ```
 
-```{r ORpoints, echo=FALSE, results='hide'}
+```{r ORpoints, eval=FALSE, echo=FALSE, results='hide'}
 # install.packages("gpclib")
+
 gpclibPermit()
 or_points <- fortify(or_merge, region = "GEOID")
 ```
 
-```{r ORdf, echo=FALSE, results='hide'}
+```{r ORdf, eval=FALSE, echo=FALSE, results='hide'}
 or_df <- left_join(or_merge@data, or_points, by = c("GEOID" = "id"))
 ```
 
 Is there a way to roll over the map and have student population size for each school district pop up? Not thrilled with color yet either.
-```{r ORmap, echo=FALSE}
+```{r ORmap, eval=FALSE, echo=FALSE, dev='jpeg'}
 or_map <-
   or_df %>% 
   ggplot() +
@@ -367,6 +367,13 @@ or_map <-
 or_map
 ```
 
+![](/Users/cassiemalcom/Desktop/CM2020/22_Winter Term Classes/EDLD 652_DS2/EDLD652_FinalPrj/Scripts/Images/ORtxtbk_colorblind.png)
+
+```{r}
+
+```
+
+
 This doesn't seem to generate any noticable changes from the above plot - DNU.
 ```{r ORmp, echo=FALSE, results='hide'}
 # map_projected <- or_map +
@@ -374,4 +381,6 @@ This doesn't seem to generate any noticable changes from the above plot - DNU.
 
 # print(map_projected)
 ```
+
+
 
