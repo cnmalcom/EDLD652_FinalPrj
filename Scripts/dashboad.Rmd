@@ -1,0 +1,596 @@
+---
+title: "US High School Students Demographics, Support, and Achievements"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+---
+
+```{r setup, include=FALSE}
+pacman::p_load("tidyverse","rio","here","janitor", "usmap","maps", "colorspace","geofacet","leaidr", "viridis","ggthemes","arrow", "forcats", "ggrepel","edld652", "mapproj","albersusa" , "cowplot", "biscale", "plotly", "ggeasy", "flexdashboard")
+```
+
+# Research Question 1a
+
+Column {data-width=650}
+-----------------------------------------------------------------------
+
+### Chart A
+
+```{r}
+
+```
+
+Column {data-width=350}
+-----------------------------------------------------------------------
+
+### Chart B
+
+```{r}
+
+```
+
+### Chart C
+
+```{r}
+
+```
+
+
+# Research Question 1b
+
+Column {data-width=650}
+-----------------------------------------------------------------------
+
+### Chart A
+
+```{r}
+
+```
+
+Column {data-width=350}
+-----------------------------------------------------------------------
+
+### Chart B
+
+```{r}
+
+```
+
+### Chart C
+
+```{r}
+
+```
+
+
+
+# Research Question 2a RLA
+
+How does the the proficiently level in language and math vary across state for High School Students? How does it differ by students characteristics such as English Learner status, Student with Disability, Low Income students?
+
+-----------------------------------------------------------------------
+
+
+```{r include=FALSE}
+rla_sc <- import(here("Data", "rla_sc.csv"))  #uncomment this read from your local. 
+fis08 <- import(here("Data","fis08.csv"))
+math_sc <- import(here("Data", "math_sc.csv"))
+enroll <- import(here("Data", "dm_total.rda"))
+```
+
+```{r include=FALSE}
+math_sc <- math_sc %>% 
+  select(LEAID, STNAM, ALL_MTHHSPCTPROF, MAM_MTHHSPCTPROF, MAS_MTHHSPCTPROF, MBL_MTHHSPCTPROF, MHI_MTHHSPCTPROF, MTR_MTHHSPCTPROF, MWH_MTHHSPCTPROF, CWD_MTHHSPCTPROF, ECD_MTHHSPCTPROF, LEP_MTHHSPCTPROF,HOM_MTHHSPCTPROF)  %>% 
+  clean_names() %>% 
+  pivot_longer(cols= ends_with("prof"), 
+              names_to = "identity", 
+              values_to = "math_pctabove",
+              names_pattern = "(.*)_mthhspctprof")
+
+math_sc$math_pctabove <- sub(".*-(.*)", "\\1", math_sc$math_pctabove) 
+math_sc$math_pctabove <- as.numeric(math_sc$math_pctabove)
+math_sc$leaid <- as.character(math_sc$leaid)
+
+  
+  
+rla_sc <- rla_sc %>% 
+   select(LEAID,STNAM, ALL_RLAHSPCTPROF, MAM_RLAHSPCTPROF, MAS_RLAHSPCTPROF, MBL_RLAHSPCTPROF, MHI_RLAHSPCTPROF, MTR_RLAHSPCTPROF, MWH_RLAHSPCTPROF, CWD_RLAHSPCTPROF, ECD_RLAHSPCTPROF, LEP_RLAHSPCTPROF, HOM_RLAHSPCTPROF)  %>%  
+  clean_names() %>% 
+  pivot_longer(cols= ends_with("prof"), 
+              names_to = "identity", 
+              values_to = "rla_pctabove",
+              names_pattern = "(.*)_rlahspctprof")
+rla_sc$rla_pctabove <- sub(".*-(.*)", "\\1", rla_sc$rla_pctabove) 
+rla_sc$rla_pctabove <- as.numeric(rla_sc$rla_pctabove)
+
+
+fis08 <- fis08 %>% 
+  select(LEAID, "textbook"= V93, "member" = V33)  %>% 
+  clean_names()
+
+all <- left_join(rla_sc, math_sc) 
+all$stnam <- stringr::str_to_title(all$stnam)
+```
+
+```{r include=FALSE}
+
+a <- all %>% 
+  filter(identity == "all") %>% 
+  group_by(stnam) %>% 
+  summarise(allmath = mean(math_pctabove, na.rm = TRUE),
+            allmath_se = sd(math_pctabove, na.rm = TRUE)/sqrt(n()),
+            allrla = mean(rla_pctabove, na.rm=TRUE),
+            allrla_se = sd(rla_pctabove, na.rm = TRUE)/sqrt(n()))
+  
+lep <- all %>% 
+  filter(identity == "lep") %>%
+  group_by(stnam) %>% 
+  summarise(lepmath = mean(math_pctabove, na.rm = TRUE), 
+            lepmath_se = sd(math_pctabove, na.rm = TRUE)/sqrt(n()),
+            leprla = mean(rla_pctabove, na.rm=TRUE),
+            leprla_se = sd(rla_pctabove, na.rm = TRUE)/sqrt(n()))
+
+ 
+cwd <- all %>% 
+  filter(identity == "cwd") %>% 
+  group_by(stnam) %>% 
+  summarise(cwdnmath = mean(math_pctabove, na.rm = TRUE),
+             cwdmath_se = sd(math_pctabove, na.rm = TRUE)/sqrt(n()),
+          cwdrla = mean(rla_pctabove, na.rm=TRUE),
+          cwdrla_se = sd(rla_pctabove, na.rm = TRUE)/sqrt(n()))
+
+ecd <- all %>% filter(identity == "ecd") %>% 
+  group_by(stnam) %>% 
+  summarise(ecdmath = mean(math_pctabove, na.rm = TRUE), 
+            ecdmath_se = sd(math_pctabove, na.rm = TRUE)/sqrt(n()),
+            ecdrla = mean(rla_pctabove, na.rm=TRUE),
+            ecdrla_se = sd(rla_pctabove, na.rm = TRUE)/sqrt(n()))
+
+r2a <- left_join(a, lep) %>% 
+  left_join(cwd) %>% 
+  left_join(ecd) %>% 
+  filter(!stnam == "Stnam", 
+           !stnam == "BUREAU OF INDIAN AFFAIRS")
+
+
+#Create dataset for District and State Level
+dist_r2b <- left_join(all, fis08) %>% 
+  select (stnam, leaid, textbook, member) %>% 
+  filter(!textbook <= 0) %>% 
+  mutate(perstudbook = textbook/member) %>% 
+  distinct()
+
+
+state_r2b <- dist_r2b %>% 
+  group_by(stnam) %>% 
+  summarise(stbook = sum(textbook),
+            member = sum(member)) %>% 
+  mutate(stperstudbook = stbook/member) %>% 
+  left_join(r2a)
+
+```
+
+```{r include=FALSE}
+us <- usa_sf()
+#us$name <- stringr::str_to_upper(us$name)
+join <- left_join(r2a, us, by = c("stnam"= "name"))
+
+a <- ggplot(join) +
+  geom_sf(aes(geometry = geometry, fill = allrla))+ 
+  scale_fill_continuous_divergingx(palette = "Earth",  labels = scales::comma)+
+  theme_minimal() + 
+  labs(title = "All Students") +
+  theme(
+    legend.position="none",
+        axis.text.x = element_blank(), 
+        axis.ticks = element_blank(),
+        axis.text.y = element_blank(),
+        rect = element_blank(),
+        panel.grid.major = element_blank())
+
+b <- ggplot(join) +
+  geom_sf(aes(geometry = geometry, fill = cwdrla))+ 
+  scale_fill_continuous_divergingx(palette = "Earth",  labels = scales::comma)+
+  theme_minimal() +
+  labs(title = "Students with Disability") +
+  theme(
+    legend.position="none",
+        axis.text.x = element_blank(), 
+        axis.ticks = element_blank(),
+        axis.text.y = element_blank(),
+        rect = element_blank(),
+        panel.grid.major = element_blank())
+  
+
+c <- ggplot(join) +
+  geom_sf(aes(geometry = geometry, fill = ecdrla))+ 
+  scale_fill_continuous_divergingx(palette = "Earth",  labels = scales::comma)+
+  theme_minimal() +
+   labs(title = "Low-income students",
+        fill = "% at and above \nprofeciency level") +
+  theme(
+    legend.position="bottom",
+        axis.text.x = element_blank(), 
+        axis.ticks = element_blank(),
+        axis.text.y = element_blank(),
+        rect = element_blank(),
+        panel.grid.major = element_blank())
+
+d <- ggplot(join) +
+  geom_sf(aes(geometry = geometry, fill = leprla))+ 
+  scale_fill_continuous_divergingx(palette = "Earth",  labels = scales::comma) +
+  theme_minimal() +
+   labs(title = "EL Students",
+        ) +
+  theme(legend.position="none",
+        axis.text.x = element_blank(), 
+        axis.ticks = element_blank(),
+        axis.text.y = element_blank(),
+        rect = element_blank(),
+        panel.grid.major = element_blank(),
+        legend.direction = "horizontal",
+        legend.key.size = unit(1, 'cm'),
+        legend.key.height = unit(.5,"cm"))
+  
+
+
+```
+Column {data-width=600}
+-----------------------------------------------------------------------
+### Percent of students at and above Reading and Languange Proficiency Level based on characteristics across the States
+
+```{r}
+p <- plot_grid(a, b, c, d)
+p
+```
+
+
+Column {.tabset data-width=400}
+-----------------------------------------------------------------------
+
+
+### A. Children with disability
+
+```{r}
+#proficiency level for children with disability
+cwdp <- r2a %>% 
+  ggplot()+
+  geom_bar(aes(allrla, fct_reorder(stnam, allrla)), stat = "identity", fill = "gray80")+
+  geom_col(aes(cwdrla, stnam), fill = "#A1D2F1")+
+  scale_x_continuous(expand = c(0,0), 
+                     limits = c(0,101))+
+    labs(title = "Students with Disabililty vs All Students",
+         y = "",
+       x= "Percent of students at and above RLA proficiency") +
+      theme_minimal() +
+   theme(plot.title.position = "plot",  #left aligned title and subtitle
+    plot.title = element_text(family = 'Helvetica', 
+                               color = '#666666', 
+                               face = 'bold', 
+                               size = 12 
+                              ))
+ 
+ggplotly(cwdp)
+```
+
+
+### B. English language learner
+
+```{r}
+#proficiency level for english language learner
+ lepp <- r2a %>% 
+  ggplot() +
+  geom_bar(aes(allrla, fct_reorder(stnam, allrla)), stat = "identity", fill = "gray80")+
+  geom_col(aes(leprla, stnam), fill = "#EEC77E")+
+  scale_x_continuous(expand = c(0,0), 
+                     limits = c(0,101))+ 
+  labs(
+       title = "English Language Learners vs All Students",
+         y = "",
+       x= "Percent of students at and above RLA proficiency") +
+    theme_minimal() +
+   theme(plot.title.position = "plot",  #left aligned title and subtitle
+    plot.title = element_text(family = 'Helvetica', 
+                               color = '#666666', 
+                               face = 'bold', 
+                               size = 12 
+                              ))
+ggplotly(lepp)
+```
+
+### C. Economically disadvantaged students
+
+```{r}
+
+#proficiency level for Economically disadvantaged students
+ecdp <- r2a %>% 
+  ggplot()+
+  geom_bar(aes(allrla, fct_reorder(stnam, allrla)), stat = "identity", fill = "gray80")+
+ geom_col(aes(ecdrla, stnam), fill = "#F1A8A1")+
+  scale_x_continuous(expand = c(0,0), 
+                     limits = c(0,101)) +
+  labs(title = "Low-Income Students vs All Students",
+         y = "",
+       x= "Percent of students at and above RLA proficiency") + 
+  theme_minimal() +
+   theme(plot.title.position = "plot",  #left aligned title and subtitle
+    plot.title = element_text(family = 'Helvetica', 
+                               color = '#666666', 
+                               face = 'bold', 
+                               size = 12, 
+                              ))
+ggplotly(ecdp)
+```
+
+
+### D. All Students
+```{r}
+allp <- r2a %>% 
+  ggplot() + 
+   geom_bar(aes(allrla, fct_reorder(stnam, allrla)), stat = "identity", fill = "gray80")+
+    scale_x_continuous(expand = c(0,0),
+                        limits = c(0,101) ) +
+   labs(title = "All High School Students Category",
+         y = "",
+       x= "Percent of students at and above RLA proficiency") +
+    theme_minimal() +
+   theme(plot.title.position = "plot",  #left aligned title and subtitle
+    plot.title = element_text(family = 'Helvetica', 
+                               color = '#666666', 
+                               face = 'bold', 
+                               size = 12 
+                              ))
+ggplotly(allp)
+```
+# Research Question 2a Math
+
+How does the the proficiently level in  math vary across state for High School Students? How does it differ by students characteristics such as English Learner status, Student with Disability, Low Income students?
+
+-----------------------------------------------------------------------
+
+Column {data-width=500}
+----------------------------------------------------------------------- 
+
+### Diverging Bars for Math Scores
+```{r include=FALSE}
+#### Diverging Plots Math
+state_r2 <- state_r2b %>% 
+  drop_na(allmath)
+
+state_r2$math_z <- round(state_r2$allmath - mean(state_r2$allmath),2)
+state_r2$math_type <-ifelse(state_r2$math_z < 0, "below", "above")
+```
+
+
+```{r}
+#Diverging plot with geom_bar
+ppmath <- state_r2 %>% 
+  mutate(stnam = fct_reorder(stnam, math_z)) %>% 
+  ggplot(aes(math_z, stnam)) +
+  geom_bar(stat = "identity", aes(fill =math_type), width=0.5)+
+  scale_fill_manual(name = "Average Math",
+                    values = c("above" = "#00ba38", "below"="#f8766d")) +
+  labs(title= "Diverging Bars",
+       subtitle = "Mean centered percent of Math at and above the proficiency",
+        x = "",
+       y = "") +
+    theme_minimal() +
+   theme(legend.position="none")
+
+ggplotly(ppmath)
+
+```
+
+Column {.tabset data-width=500}
+-----------------------------------------------------------------------
+
+
+### Textbook spending across the US
+
+```{r}
+textbook_us <- left_join( us, state_r2b, by = c("name" = "stnam")) %>% 
+ggplot() +
+  geom_sf(aes(geometry = geometry, fill = stperstudbook)) + 
+  scale_fill_continuous_divergingx(palette = "Earth",  labels = scales::dollar) +
+  theme(axis.text.x = element_blank(), 
+        axis.ticks = element_blank(),
+        axis.text.y = element_blank(),
+        rect = element_blank(),
+        panel.grid.major = element_blank(),
+        legend.position = "none",
+        legend.direction = "horizontal",
+        legend.key.size = unit(1, 'cm'),
+        legend.key.height = unit(.5,"cm")) +
+  labs(fill = "Textbook Spending per Student")
+ggplotly(textbook_us)
+```
+
+
+
+### Virginia
+```{r include=FALSE}
+book_va <- dist_r2b %>% 
+  filter(stnam == "Virginia")
+  
+va <- lea_get(state = "va") %>% 
+    sf::st_as_sf() 
+
+va_book <- left_join(va, book_va,by = c("GEOID" = "leaid")) %>% 
+  ggplot() +
+  geom_sf(aes(fill = perstudbook), size = 0.1) +
+  scale_fill_continuous_divergingx(palette = "Earth",  labels = scales::dollar) +
+  theme_minimal()+
+  theme(legend.position = "none",
+        legend.direction = "horizontal",
+        legend.key.size = unit(1, 'cm'),
+        legend.key.height = unit(.5,"cm"),
+        axis.text.x=element_blank(),
+        axis.text.y=element_blank()) +
+  labs(fill = "Textbook funding per student",
+       title = "Virginia")
+```
+
+```{r}
+ggplotly(va_book)
+```
+
+### West Virginia
+
+```{r include=FALSE}
+textbook_wv <- dist_r2b %>% 
+  filter(stnam == "West Virginia")
+  
+
+wv <- lea_get(state = "wv") %>% 
+    sf::st_as_sf() 
+
+wv_book <- left_join(wv, textbook_wv,by = c("GEOID" = "leaid")) %>% 
+  ggplot() +
+  geom_sf(aes(fill = perstudbook), size = 0.1) +
+  theme_minimal()+
+  scale_fill_continuous_divergingx(palette = "Earth",  labels = scales::dollar) +
+  theme_minimal()+
+  theme(legend.position = "none",
+        legend.direction = "horizontal",
+        legend.key.size = unit(1, 'cm'),
+        legend.key.height = unit(.5,"cm"),
+        axis.text.x=element_blank(),
+        axis.text.y=element_blank()) +
+  labs(title= "Textbook spending per school district in the State of West Virginia",
+         fill = "Textbook funding per student")
+```
+
+
+```{r}
+ggplotly(wv_book)
+```
+
+
+### Oregon
+
+```{r}
+
+```
+
+
+# Research Question 2b
+
+Column {data-width=600}
+-----------------------------------------------------------------------
+### Final Option. 
+```{r}
+
+fo <- state_r2b %>% 
+  mutate(stnam = fct_reorder(stnam, allrla)) %>% 
+ggplot(aes(allrla, fct_reorder(stnam, allrla))) +
+  geom_segment(aes(y = stnam, yend = stnam, x = 0, xend = allrla), color = "skyblue", size = 1) +
+  geom_point(aes(size = stperstudbook), color="orange") + #, alpha= 0.7) +
+  labs(title = "Textbook Spending per Student and RLA proficiency", 
+       #subtitle = "Arranged by Textbook spending",
+       x= "Percent of students at and above proficiency level",
+       y="",
+       size= "Spending on textbook per student",
+       color="",
+       legend= "") +
+  theme_minimal() +
+   theme(legend.position = "bottom",
+        legend.direction = "horizontal",
+        legend.key.size = unit(1, 'cm'),
+        legend.key.height = unit(.5,"cm"),
+        legend.text=element_text(color="white",size=6),
+        axis.title.x = element_text(colour = "white", size = 10),
+        axis.text.y = element_text(color="white", 
+                           size=8),
+        axis.text.x = element_text(face="bold", color="white", 
+                           size=10), 
+        plot.title = element_text(colour = "white", size = 15),
+    plot.subtitle = element_text(colour = "white"),
+    plot.caption = element_text(colour = "white"),
+    plot.background = element_rect(fill = "#1B2547"),
+    panel.background = element_rect(fill = "#1B2547"),
+    panel.grid.major.y = element_blank(),
+    panel.border = element_blank(),
+    axis.ticks.y = element_blank(),
+    plot.title.position = "plot") +
+   scale_x_continuous(expand = c(0,0), 
+                     limits = c(0,110)) +
+  guides(color = "white")
+
+ggplotly(fo)
+```
+
+Column {data-width=400}
+-----------------------------------------------------------------------
+
+### Option 1
+```{r}
+op1 <- state_r2b %>% 
+  mutate(stnam = fct_reorder(stnam, allrla)) %>% 
+ggplot(aes(allrla, fct_reorder(stnam, allrla))) +
+  geom_point(aes(size = stperstudbook), color="blue",alpha= 0.5) +
+  geom_vline(xintercept = mean(state_r2b$allrla), linetype = "dashed", color = "red") +
+  labs(title = "Textbook Spending per Student and RLA proficiency", 
+       #subtitle = "Arranged by Textbook spending",
+       x= "Percent of students at and above proficiency level",
+       y="",
+       size= "Spending on textbook per student",
+       color="",
+       legend= "") +
+  annotate(x=mean(state_r2b$allrla),y="Montana",label="National \nAverage",geom="label", size = 6)+
+  theme_minimal() +
+  theme(axis.text.y = element_text(size=8))
+ggplotly(op1)
+```
+
+
+
+### Option 2
+```{r}
+pmath <- state_r2 %>% 
+  mutate(stnam = fct_reorder(stnam, math_z)) %>% 
+  ggplot(aes(math_z, stnam)) +
+  geom_point(stat = "identity", color ="#D7987F", size=2.5)+
+  geom_segment(aes(y= stnam,
+                   x = 0,
+                   yend= stnam,
+                   xend=math_z), color = "#D7987F", size = .5) +
+  geom_text(aes(label = math_z), color = "black", size = 1.5) + 
+  labs(title= "Diverging Lollipop Chart",
+       subtitle = "Mean centered percent of Math at and above the proficiency",
+       x = "",
+       y = "") +
+  theme_minimal() +
+  theme(axis.text.y = element_text(size=8))
+ggplotly(pmath)
+```
+
+# Research Question 3 
+
+Column {data-width=650}
+-----------------------------------------------------------------------
+
+### Chart A
+
+```{r}
+
+```
+
+Column {data-width=350}
+-----------------------------------------------------------------------
+
+### Chart B
+
+```{r}
+
+```
+
+### Chart C
+
+```{r}
+
+```
+
+
+
+
