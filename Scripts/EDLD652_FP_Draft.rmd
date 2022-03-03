@@ -30,7 +30,7 @@ knitr::opts_chunk$set(echo = TRUE,
 <<<<<<< HEAD
 pacman::p_load("tidyverse","rio","here","janitor", "usmap","maps", "colorspace","geofacet", "viridis","ggthemes","arrow", "forcats", "ggrepel", edld652, psych, dplyr, stringr, readr, tidyr, corrplot, Hmisc)
 =======
-pacman::p_load("tidyverse","rio","here","janitor", "usmap","maps", "colorspace","geofacet","leaidr", "viridis","ggthemes","arrow", "forcats", "ggrepel","edld652", "mapproj","albersusa" , "cowplot")
+pacman::p_load("tidyverse","rio","here","janitor", "usmap","maps", "colorspace","geofacet","leaidr", "viridis","ggthemes","arrow", "forcats", "ggrepel","edld652", "mapproj","albersusa" , "cowplot", "biscale", "plotly", "ggeasy", "flexdashboard")
 >>>>>>> main
 ```
 
@@ -449,6 +449,7 @@ fis08 <- fis08 %>%
 
 #Create new data set for ALL, LEP, CWD, ECD category
 all <- left_join(rla_sc, math_sc) 
+all$stnam <- stringr::str_to_title(all$stnam)
 #all students 
 
 
@@ -487,14 +488,14 @@ ecd <- all %>% filter(identity == "ecd") %>%
 r2a <- left_join(a, lep) %>% 
   left_join(cwd) %>% 
   left_join(ecd) %>% 
-  filter(!stnam == "stnam", 
+  filter(!stnam == "Stnam", 
            !stnam == "BUREAU OF INDIAN AFFAIRS")
 ```
 
 ```{r}
 r2a %>% 
   ggplot() + 
-  geom_bar(aes(allrla, stnam), stat = "identity", fill = "gray80") +
+   geom_bar(aes(allrla, fct_reorder(stnam, allrla)), stat = "identity", fill = "gray80")+
     scale_x_continuous(expand = c(0,0),
                         limits = c(0,101) ) +
    labs(title = "Percentage of students at and above RLA proficiency across states",
@@ -513,11 +514,12 @@ r2a %>%
 #proficiency level for english language learner
  r2a %>% 
   ggplot() +
+  geom_bar(aes(allrla, fct_reorder(stnam, allrla)), stat = "identity", fill = "gray80")+
   geom_col(aes(leprla, stnam), fill = "#EEC77E")+
   scale_x_continuous(expand = c(0,0), 
                      limits = c(0,101))+ 
   labs(title = "Percentage of students at and above RLA proficiency across states",
-       subtitle = "English Language Learners Category",
+       subtitle = "English Language Learners vs All Students",
          y = "",
        x= "Percent of students at and above RLA proficiency") +
     theme_minimal() +
@@ -532,11 +534,12 @@ r2a %>%
 #proficiency level for children with disability
 r2a %>% 
   ggplot()+
+  geom_bar(aes(allrla, fct_reorder(stnam, allrla)), stat = "identity", fill = "gray80")+
   geom_col(aes(cwdrla, stnam), fill = "#A1D2F1")+
   scale_x_continuous(expand = c(0,0), 
                      limits = c(0,101))+
     labs(title = "Percentage of students at and above RLA proficiency across states",
-       subtitle = "Students with disabililty category",
+       subtitle = "Students with Disabililty vs All Students",
          y = "",
        x= "Percent of students at and above RLA proficiency") +
       theme_minimal() +
@@ -551,11 +554,12 @@ r2a %>%
 #proficiency level for Economically disadvantaged students
 r2a %>% 
   ggplot()+
-  geom_col(aes(ecdrla, stnam), fill = "#F1A8A1")+
+  geom_bar(aes(allrla, fct_reorder(stnam, allrla)), stat = "identity", fill = "gray80")+
+ geom_col(aes(ecdrla, stnam), fill = "#F1A8A1")+
   scale_x_continuous(expand = c(0,0), 
                      limits = c(0,101)) +
   labs(title = "Percentage of High School students at and above RLA proficiency across states",
-       subtitle = "Low-Income Students Category",
+       subtitle = "Low-Income Students vs All Students",
          y = "",
        x= "Percent of students at and above RLA proficiency") + 
   theme_minimal() +
@@ -574,7 +578,7 @@ r2a %>%
 library(albersusa)
 
 us <- usa_sf()
-us$name <- stringr::str_to_upper(us$name)
+#us$name <- stringr::str_to_upper(us$name)
 join <- left_join(r2a, us, by = c("stnam"= "name"))
 
 a <- ggplot(join) +
@@ -595,9 +599,29 @@ c <- ggplot(join) +
 d <- ggplot(join) +
   geom_sf(aes(geometry = geometry, fill = leprla))+ 
   scale_fill_continuous_divergingx(palette = "Earth",  labels = scales::comma) +
-  theme_void()
+  theme_void() 
 
 plot_grid(a, b, c, d)
+
+
+textbook_us <- left_join( us, state_r2b, by = c("name" = "stnam")) %>% 
+ggplot() +
+  geom_sf(aes(geometry = geometry, fill = stperstudbook)) + 
+  scale_fill_continuous_divergingx(palette = "Earth",  labels = scales::dollar) +
+  theme(axis.text.x = element_blank(), 
+        axis.ticks = element_blank(),
+        axis.text.y = element_blank(),
+        rect = element_blank(),
+        panel.grid.major = element_blank(),
+        legend.position = "bottom",
+        legend.direction = "horizontal",
+        legend.key.size = unit(1, 'cm'),
+        legend.key.height = unit(.5,"cm")) +
+  labs(fill = "Textbook Spending per Student") 
+
+  
+  ggplotly(textbook_us)
+
 ```
 
 
@@ -622,7 +646,8 @@ state_r2b <- dist_r2b %>%
 
 ```
 
-#### Relationship between Textbook Spending & RLA / Math Achievement 
+#### Relationship between Textbook Spending & RLA / Math Achievement in the State Level
+
 ```{r}
 state_r2b  %>% 
   ggplot()+
@@ -657,14 +682,30 @@ state_r2b%>%
 
 ```{r}
 
- mean(state_r2b$allrla)  
-  
 state_r2b %>% 
   mutate(stnam = fct_reorder(stnam, allrla)) %>% 
 ggplot(aes(allrla, fct_reorder(stnam, allrla))) +
-  geom_segment(aes(y = stnam, yend = stnam, x = 0, xend = allrla), color = "skyblue", size = 1.5) +
-  geom_point(aes(size = stperstudbook), color="orange", alpha= 0.7) +
+  geom_point(aes(size = stperstudbook), color="blue",alpha= 0.5) +
+  geom_vline(xintercept = mean(state_r2b$allrla), linetype = "dashed", color = "red") +
   labs(title = "Textbook Spending per Student and RLA proficiency", 
+       #subtitle = "Arranged by Textbook spending",
+       x= "Percent of students at and above proficiency level",
+       y="",
+       size= "Spending on textbook per student",
+       color="",
+       legend= "") +
+  annotate(x=mean(state_r2b$allrla),y="Montana",label="National \nAverage",geom="label", size = 6)+
+  theme_minimal() #+
+  # theme(plot.background = element_rect(fill = "#EAF1DC"))
+
+
+state_r2b %>% 
+  mutate(stnam = fct_reorder(stnam, allrla)) %>% 
+ggplot(aes(allrla, fct_reorder(stnam, allrla))) +
+  geom_segment(aes(y = stnam, yend = stnam, x = 0, xend = allrla), color = "skyblue", size = 2) +
+  geom_point(aes(size = stperstudbook), color="orange") + #, alpha= 0.7) +
+  labs(title = "Textbook Spending per Student and RLA proficiency", 
+       #subtitle = "Arranged by Textbook spending",
        x= "Percent of students at and above proficiency level",
        y="",
        size= "Spending on textbook per student",
@@ -678,7 +719,7 @@ ggplot(aes(allrla, fct_reorder(stnam, allrla))) +
         legend.text=element_text(color="white",size=6),
         axis.title.x = element_text(colour = "white", size = 10),
         axis.text.y = element_text(color="white", 
-                           size=7),
+                           size=15),
         axis.text.x = element_text(face="bold", color="white", 
                            size=10), 
         plot.title = element_text(colour = "white", size = 15),
@@ -699,32 +740,136 @@ ggplot(aes(allrla, fct_reorder(stnam, allrla))) +
   
 
 ```
-```{r}
-ggplot(aes(country_name, n)) +
-  geom_segment(aes(x = country_name, xend = country_name, y = 0, yend = n), color = "skyblue", size = 2) +
-  geom_point(color = "orange", size = 6) +
-  labs(title = "Countries Issued the Most Border Closure Policies",
-    subtitle = "Related to COVID-19, Jan-2020 to Apr-2021",
-    x = "",
-    y = "Number of Policy Issued",
-    caption = "Source: Covid Border Accountability Project (COBAP)") +
-  coord_flip() +
+```{r heatmap}
+
+biscale <- state_r2b %>% 
+  bi_class(allrla, stperstudbook, style = "quantile", dim = 3) %>% 
+  left_join(statepop, by=c("stnam"= "full"))
+
+
+plot_usmap(data = biscale, values = "bi_class", labels = TRUE, label_color = "white")+
+  scale_x_continuous(breaks = NULL) + 
+  scale_y_continuous(breaks = NULL) 
+
+
+
++
   theme(
-    axis.title.x = element_text(colour = "white", size = 15),
-    axis.text.y = element_text(color="white", 
-                           size=14),
-    axis.text.x = element_text(face="bold", color="white", 
-                           size=14),
-    plot.title = element_text(colour = "white", size = 18),
-    plot.subtitle = element_text(colour = "white"),
-    plot.caption = element_text(colour = "white"),
-    plot.background = element_rect(fill = "#1B2547"),
-    panel.background = element_rect(fill = "#1B2547"),
+    plot.title = element_text(margin = margin(b = 8), 
+                              color = "#ffffff",face = "bold",size = 9,
+                              hjust = 0.5,
+                              family = "Arial"),
+    plot.subtitle = element_text(margin = margin(t=10,b = 25), 
+                                 color = "#ffffff", size = 6, family = "Arial",
+                                 hjust = 0.5),
+    plot.caption =  element_text(margin = margin(t = 20), 
+                                 color = "#ffffff", size = 5, family = "Arial",
+                                 hjust = 0.95),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    legend.title = element_blank(),
+    axis.text.x    = element_blank(),
+    axis.text.y    = element_blank(),
+    panel.background = element_blank(), 
+    panel.grid.major = element_blank(),
     panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank(), 
+    plot.background = element_rect(fill = "#f3f3f3", color = NA),
     panel.border = element_blank(),
-    axis.ticks.y = element_blank(),
-    plot.title.position = "plot")
+    plot.margin = unit(c(1, 1, 1, 1), "cm"),
+    axis.ticks = element_blank()
+  ) 
+  
+
 ```
+
+#### Diverging Plots
+```{r}
+  
+state_r2b$rla_z <- round((state_r2b$allrla - mean(state_r2b$allrla)), 2)
+state_r2b$rla_type <-ifelse(state_r2b$rla_z < 0, "below", "above")
+
+
+#Diverging plot with geom_bar
+
+state_r2b %>% 
+  mutate(stnam = fct_reorder(stnam, rla_z)) %>% 
+  ggplot(aes(rla_z, stnam)) +
+  geom_bar(stat = "identity", aes(fill =rla_type), width=0.5)+
+  scale_fill_manual(name = "Average RLA", 
+                    labels = c("Above Average", "Below Average"),
+                    values = c("above" = "#00ba38", "below"="#f8766d")) +
+  theme_minimal()+
+  labs(title= "Diverging Bars",
+       subtitle = "Mean-Centered RLA percentage at and above the proficiency level",
+        x = "Normalised Percent of RLA Proficiency",
+       y = "")
+
+
+#Diverging plot with Lollipop Chart
+
+p <- state_r2b %>% 
+  mutate(stnam = fct_reorder(stnam, rla_z)) %>% 
+  ggplot(aes(rla_z, stnam)) +
+  geom_point(stat = "identity", color ="#B07FD7", size=15)+
+  geom_segment(aes(y= stnam,
+                   x = 0,
+                   yend= stnam,
+                   xend=rla_z), color = "#B07FD7", size = 2) +
+  geom_text(aes(label = rla_z), color = "white", size = 4) + 
+  labs(title= "Diverging Lollipop Chart",
+       subtitle = "Mean-centered RLA percentage at and above the proficiency level",
+       x = "",
+       y = "")+
+  theme_minimal()
+p
+```
+
+
+```{r}
+#### Diverging Plots Math
+state_r2 <- state_r2b %>% 
+  drop_na(allmath)
+
+state_r2$math_z <- round(state_r2$allmath - mean(state_r2$allmath),2)
+state_r2$math_type <-ifelse(state_r2$math_z < 0, "below", "above")
+
+
+#Diverging plot with geom_bar
+
+state_r2 %>% 
+  mutate(stnam = fct_reorder(stnam, math_z)) %>% 
+  ggplot(aes(math_z, stnam)) +
+  geom_bar(stat = "identity", aes(fill =math_type), width=0.5)+
+  scale_fill_manual(name = "Average Math", 
+                    labels = c("Above Average", "Below Average"),
+                    values = c("above" = "#00ba38", "below"="#f8766d")) +
+  theme_minimal()+
+  labs(title= "Diverging Bars",
+       subtitle = "Mean centered percent of Math at and above the proficiency",
+        x = "",
+       y = "")
+
+
+#Diverging plot with Lollipop Chart
+
+pmath <- state_r2 %>% 
+  mutate(stnam = fct_reorder(stnam, math_z)) %>% 
+  ggplot(aes(math_z, stnam)) +
+  geom_point(stat = "identity", color ="#D7987F", size=15)+
+  geom_segment(aes(y= stnam,
+                   x = 0,
+                   yend= stnam,
+                   xend=math_z), color = "#D7987F", size = 2) +
+  geom_text(aes(label = math_z), color = "black", size = 5) + 
+  labs(title= "Diverging Lollipop Chart",
+       subtitle = "Mean centered percent of Math at and above the proficiency",
+       x = "",
+       y = "") +
+  theme_minimal()
+pmath
+```
+
 
 ```{r}
 
@@ -747,12 +892,12 @@ ggplot(aes(x = allrla, y = reorder(stnam, allrla))) +
         legend.direction = "horizontal",
         legend.key.size = unit(1, 'cm'),
         legend.key.height = unit(.5,"cm"),
-        axis.text.y = element_text(size=7),
+        axis.text.y = element_text(size=15),
         plot.title.position = "plot", # easiest way to left align title
         plot.caption = element_text(hjust = 0.5, size = 12),
         panel.grid.major.y = element_blank(),
         panel.grid.minor.x = element_blank(),
-        axis.text = element_text(size = 12)) +
+        axis.text = element_text(size = 15)) +
   labs(title = "Reading and Language Proficiency across States") +
     scale_x_continuous(name ="Percent of students at and above proficiency level", 
                        breaks = seq(0, 50, 100),
@@ -780,7 +925,7 @@ ggplot(aes(x = allmath, y = reorder(stnam, allmath))) +
         legend.direction = "horizontal",
         legend.key.size = unit(1, 'cm'),
         legend.key.height = unit(.5,"cm"),
-        axis.text.y = element_text(size=7),
+        axis.text.y = element_text(size=15),
         plot.title.position = "plot", # easiest way to left align title
         plot.caption = element_text(hjust = 0.5, size = 12),
         panel.grid.major.y = element_blank(),
@@ -795,11 +940,32 @@ ggplot(aes(x = allmath, y = reorder(stnam, allmath))) +
    
 ```
 
+```{r}
+region <- import(here("data", "us census bureau regions and divisions.csv")) %>% 
+  rename(stnam = State) 
+heatmap <- left_join(state_r2b, region)
+
+heatmap %>% 
+    group_by(Region, stnam) %>% 
+  drop_na() %>% 
+    ggplot() +
+    geom_col(aes(allmath, fct_reorder(stnam, allmath), fill = Region)) + 
+      labs(x= "Percent of student at and above Proficiency level in Math",
+       y = "State",
+       title = "Math Proficiency by Region") + 
+    theme_light()+
+    scale_x_continuous(expand = c(0,0), labels = scales::comma ) + 
+  theme (axis.ticks = element_blank()) + 
+    scico::scale_fill_scico_d() 
+   
+```
+
 #### Variation in District Textbook Spending for each state
 ```{r}
+
 #Check the state with the highest proficiency level: Virginia 
 book_va <- dist_r2b %>% 
-  filter(stnam == "VIRGINIA")
+  filter(stnam == "Virginia")
   
 va <- lea_get(state = "va") %>% 
     sf::st_as_sf() 
@@ -808,11 +974,13 @@ va_book <- left_join(va, book_va,by = c("GEOID" = "leaid")) %>%
   ggplot() +
   geom_sf(aes(fill = perstudbook), size = 0.1) +
   scale_fill_continuous_divergingx(palette = "Earth",  labels = scales::dollar) +
-  theme_void()+
+  theme_minimal()+
   theme(legend.position = "bottom",
         legend.direction = "horizontal",
         legend.key.size = unit(1, 'cm'),
-        legend.key.height = unit(.5,"cm")) +
+        legend.key.height = unit(.5,"cm"),
+        axis.text.x=element_blank(),
+        axis.text.y=element_blank()) +
   labs(fill = "Textbook funding per student")
 
 va_book
@@ -825,7 +993,7 @@ va_book
 ```{r}
 #Check the state with the lowest proficiency level: West Virginia 
 textbook_wv <- dist_r2b %>% 
-  filter(stnam == "WEST VIRGINIA")
+  filter(stnam == "West Virginia")
   
 
 wv <- lea_get(state = "wv") %>% 
@@ -836,11 +1004,13 @@ wv_book <- left_join(wv, textbook_wv,by = c("GEOID" = "leaid")) %>%
   geom_sf(aes(fill = perstudbook), size = 0.1) +
   theme_minimal()+
   scale_fill_continuous_divergingx(palette = "Earth",  labels = scales::dollar) +
-  theme_void()+
+  theme_minimal()+
   theme(legend.position = "bottom",
         legend.direction = "horizontal",
         legend.key.size = unit(1, 'cm'),
-        legend.key.height = unit(.5,"cm")) +
+        legend.key.height = unit(.5,"cm"),
+        axis.text.x=element_blank(),
+        axis.text.y=element_blank()) +
   labs(title= "Textbook spending per school district in the State of West Virginia",
          fill = "Textbook funding per student")
 
@@ -857,7 +1027,7 @@ wv_book
 ```{r oregon-textbookplot, eval=FALSE, include=FALSE}
 #  Oregon 
 textbook_or <- dist_r2b %>% 
-  filter(stnam == "OREGON")
+  filter(stnam == "Oregon")
   
 
 or <- lea_get(state = "or") %>% 
@@ -867,11 +1037,13 @@ or_book <- left_join(or, textbook_or,by = c("GEOID" = "leaid")) %>%
   ggplot() +
   geom_sf(aes(fill = perstudbook), size = 0.1) +
   scale_fill_continuous_divergingx(palette = "Earth",  labels = scales::dollar) +
-  theme_void()+
+  theme_minimal()+
   theme(legend.position = "bottom",
         legend.direction = "horizontal",
         legend.key.size = unit(1, 'cm'),
-        legend.key.height = unit(.5,"cm")) +
+        legend.key.height = unit(.5,"cm"),
+        axis.text.x=element_blank(),
+        axis.text.y=element_blank()) +
   labs(fill = "Textbook funding per student", 
        title= "Textbook spending per school district in the State of Oregon")
 
