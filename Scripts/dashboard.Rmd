@@ -65,7 +65,7 @@ Column {data-width=350}
 
 
 
-# Research Question 2a RLA
+# RQ2 RLA
 
 How does the the proficiently level in language and math vary across state for High School Students? How does it differ by students characteristics such as English Learner status, Student with Disability, Low Income students?
 
@@ -343,16 +343,13 @@ allp <- r2a %>%
                               ))
 ggplotly(allp)
 ```
-# Research Question 2a Math
+# RQ2 Math 
 
 How does the the proficiently level in  math vary across state for High School Students? How does it differ by students characteristics such as English Learner status, Student with Disability, Low Income students?
 
 -----------------------------------------------------------------------
 
-Column {data-width=500}
------------------------------------------------------------------------ 
 
-### Diverging Bars for Math Scores
 ```{r include=FALSE}
 #### Diverging Plots Math
 state_r2 <- state_r2b %>% 
@@ -361,6 +358,37 @@ state_r2 <- state_r2b %>%
 state_r2$math_z <- round(state_r2$allmath - mean(state_r2$allmath),2)
 state_r2$math_type <-ifelse(state_r2$math_z < 0, "below", "above")
 ```
+
+Column {data-width=500}
+----------------------------------------------------------------------- 
+
+
+### Math Profiency by Regions
+
+```{r}
+region <- import(here("data", "us census bureau regions and divisions.csv")) %>% 
+  rename(stnam = State) 
+heatmap <- left_join(state_r2b, region)
+
+heatmap %>% 
+    group_by(Region, stnam) %>% 
+  drop_na() %>% 
+    ggplot() +
+    geom_col(aes(allmath, fct_reorder(stnam, allmath), fill = Region)) + 
+      labs(x= "Percent of student at and above Proficiency level in Math",
+       y = "",
+       title = "Math Proficiency by Region") + 
+    theme_light()+
+    scale_x_continuous(expand = c(0,0), labels = scales::comma ) + 
+  theme (axis.ticks = element_blank()) + 
+    scico::scale_fill_scico_d() 
+```
+
+
+Column {.tabset data-width=500}
+----------------------------------------------------------------------- 
+
+### Diverging Bars for Math Scores
 
 
 ```{r}
@@ -382,13 +410,35 @@ ggplotly(ppmath)
 
 ```
 
-Column {.tabset data-width=500}
------------------------------------------------------------------------
-
-
-### Textbook spending across the US
+### Diverging Lollipop Chart - Math
 
 ```{r}
+pmath <- state_r2 %>% 
+  mutate(stnam = fct_reorder(stnam, math_z)) %>% 
+  ggplot(aes(math_z, stnam)) +
+  geom_point(stat = "identity", color ="#D7987F", size=2.5)+
+  geom_segment(aes(y= stnam,
+                   x = 0,
+                   yend= stnam,
+                   xend=math_z), color = "#D7987F", size = .5) +
+  geom_text(aes(label = math_z), color = "black", size = 1.5) + 
+  labs(title= "Diverging Lollipop Chart",
+       subtitle = "Mean centered percent of Math at and above the proficiency",
+       x = "",
+       y = "") +
+  theme_minimal() +
+  theme(axis.text.y = element_text(size=8))
+ggplotly(pmath)
+```
+
+
+# RQ2 Textbook Expenses
+
+
+
+-----------------------------------------------------------------------
+
+```{r include=FALSE}
 textbook_us <- left_join( us, state_r2b, by = c("name" = "stnam")) %>% 
 ggplot() +
   geom_sf(aes(geometry = geometry, fill = stperstudbook)) + 
@@ -403,10 +453,21 @@ ggplot() +
         legend.key.size = unit(1, 'cm'),
         legend.key.height = unit(.5,"cm")) +
   labs(fill = "Textbook Spending per Student")
+```
+
+Column {data-width=500}
+-----------------------------------------------------------------------
+
+### Textbook spending across the US
+
+```{r}
+
 ggplotly(textbook_us)
 ```
 
 
+Column {.tabset data-width=500}
+-----------------------------------------------------------------------
 
 ### Virginia
 ```{r include=FALSE}
@@ -474,13 +535,15 @@ ggplotly(wv_book)
 ```
 
 
-# Research Question 2b
+
+# RQ2 Achievement vs Spending
 
 Column {data-width=600}
 -----------------------------------------------------------------------
-### Final Option. 
-```{r}
 
+### Final Option
+
+```{r include=FALSE}
 fo <- state_r2b %>% 
   mutate(stnam = fct_reorder(stnam, allrla)) %>% 
 ggplot(aes(allrla, fct_reorder(stnam, allrla))) +
@@ -516,7 +579,10 @@ ggplot(aes(allrla, fct_reorder(stnam, allrla))) +
    scale_x_continuous(expand = c(0,0), 
                      limits = c(0,110)) +
   guides(color = "white")
+```
 
+
+```{r}
 ggplotly(fo)
 ```
 
@@ -543,27 +609,20 @@ ggplot(aes(allrla, fct_reorder(stnam, allrla))) +
 ggplotly(op1)
 ```
 
-
-
-### Option 2
+### lm rla
 ```{r}
-pmath <- state_r2 %>% 
-  mutate(stnam = fct_reorder(stnam, math_z)) %>% 
-  ggplot(aes(math_z, stnam)) +
-  geom_point(stat = "identity", color ="#D7987F", size=2.5)+
-  geom_segment(aes(y= stnam,
-                   x = 0,
-                   yend= stnam,
-                   xend=math_z), color = "#D7987F", size = .5) +
-  geom_text(aes(label = math_z), color = "black", size = 1.5) + 
-  labs(title= "Diverging Lollipop Chart",
-       subtitle = "Mean centered percent of Math at and above the proficiency",
-       x = "",
-       y = "") +
-  theme_minimal() +
-  theme(axis.text.y = element_text(size=8))
-ggplotly(pmath)
+state_r2b%>% 
+  ggplot(aes(stperstudbook,allrla))+
+  geom_point() +
+  geom_smooth(method = "lm")+
+  geom_text_repel(aes(label = stnam))+
+  scale_x_continuous(expand = c(0,0)) +
+  labs(title= "Textbook Spending & RLA Achievement",
+      x = "Textbook spending per student", 
+       y = "Percent of Students at Proficiency Level")
 ```
+
+
 
 # Research Question 3 
 

@@ -490,7 +490,25 @@ r2a <- left_join(a, lep) %>%
   left_join(ecd) %>% 
   filter(!stnam == "Stnam", 
            !stnam == "BUREAU OF INDIAN AFFAIRS")
+
+
+#Create dataset for District and State Level
+dist_r2b <- left_join(all, fis08) %>% 
+  select (stnam, leaid, textbook, member) %>% 
+  filter(!textbook <= 0) %>% 
+  mutate(perstudbook = textbook/member) %>% 
+  distinct()
+
+
+state_r2b <- dist_r2b %>% 
+  group_by(stnam) %>% 
+  summarise(stbook = sum(textbook),
+            member = sum(member)) %>% 
+  mutate(stperstudbook = stbook/member) %>% 
+  left_join(r2a)
+
 ```
+
 
 ```{r}
 r2a %>% 
@@ -628,23 +646,6 @@ ggplot() +
 
 
 ### 2b. What is the relationship between district spending on textbook and students proficiency level? 
-```{r}
-#Create dataset for District and State Level
-dist_r2b <- left_join(all, fis08) %>% 
-  select (stnam, leaid, textbook, member) %>% 
-  filter(!textbook <= 0) %>% 
-  mutate(perstudbook = textbook/member) %>% 
-  distinct()
-
-
-state_r2b <- dist_r2b %>% 
-  group_by(stnam) %>% 
-  summarise(stbook = sum(textbook),
-            member = sum(member)) %>% 
-  mutate(stperstudbook = stbook/member) %>% 
-  left_join(r2a)
-
-```
 
 #### Relationship between Textbook Spending & RLA / Math Achievement in the State Level
 
@@ -752,35 +753,6 @@ plot_usmap(data = biscale, values = "bi_class", labels = TRUE, label_color = "wh
   scale_y_continuous(breaks = NULL) 
 
 
-
-+
-  theme(
-    plot.title = element_text(margin = margin(b = 8), 
-                              color = "#ffffff",face = "bold",size = 9,
-                              hjust = 0.5,
-                              family = "Arial"),
-    plot.subtitle = element_text(margin = margin(t=10,b = 25), 
-                                 color = "#ffffff", size = 6, family = "Arial",
-                                 hjust = 0.5),
-    plot.caption =  element_text(margin = margin(t = 20), 
-                                 color = "#ffffff", size = 5, family = "Arial",
-                                 hjust = 0.95),
-    axis.title.x = element_blank(),
-    axis.title.y = element_blank(),
-    legend.title = element_blank(),
-    axis.text.x    = element_blank(),
-    axis.text.y    = element_blank(),
-    panel.background = element_blank(), 
-    panel.grid.major = element_blank(),
-    panel.grid.major.y = element_blank(),
-    panel.grid.minor = element_blank(), 
-    plot.background = element_rect(fill = "#f3f3f3", color = NA),
-    panel.border = element_blank(),
-    plot.margin = unit(c(1, 1, 1, 1), "cm"),
-    axis.ticks = element_blank()
-  ) 
-  
-
 ```
 
 #### Diverging Plots
@@ -871,7 +843,7 @@ pmath
 ```
 
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 
 state_r2b %>% 
 ggplot(aes(x = allrla, y = reorder(stnam, allrla))) +
