@@ -272,8 +272,9 @@ myXT <- xtable(corstarsl(tbd_corr[,2:5]))
 names(myXT) <- c("Total Number of Students per District", "Textbook Expenditure per Student", "Percent of Student Population Identifying as Minority", "Percent of Student Population Identifying as White")
 ```
 
+Removed print function - see if this works in the dashboard
 ```{r corr5, echo=FALSE, dev='jpeg'}
-print(xtable(myXT, caption = "Correlation Table for Textbook Expenditure"), caption.placement = 'top')
+xtable(myXT, caption = "Correlation Table for Textbook Expenditure", caption.placement = 'top')
 ```
 
 ```{r corr6, echo=FALSE, dev='jpeg'}
