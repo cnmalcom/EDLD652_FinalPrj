@@ -592,11 +592,11 @@ corstarsl <- function(tbd_corr){
 
 corstarsl(tbd_corr)
 
-xtable(corstarsl(tbd_corr[,1:5]))
+xtable(corstarsl(tbd_corr[, ,2:5]))
 ```
 
 ```{r corr4, include=FALSE}
-myXT <- xtable(corstarsl(tbd_corr[,2:5]))
+myXT <- xtable(corstarsl(tbd_corr[, ,2:5]))
 
 names(myXT) <- c("Total Number of Students per District", "Textbook Expenditure per Student", "Percent of Student Population Identifying as Minority", "Percent of Student Population Identifying as White")
 ```
@@ -674,14 +674,14 @@ The ovals display the type of correlation direction, but there are no significan
 ### Initial Full Correlation Matrix
 
 ```{r corr7, echo=FALSE, dev='jpeg'}
-chart.Correlation(tbd_corr[,2:5], title = "Textbook Expenditure Correlation Matrix")
+chart.Correlation(tbd_corr[, ,2:5], title = "Textbook Expenditure Correlation Matrix")
 ```
 This initial version seems to busy with the large vs. small font sizes and red lines.
 
 ### Second Full Correlation Matrix
 
 ```{r corr8, echo=FALSE, dev='jpeg'}
-ggpairs(tbd_corr[,2:5], 
+ggpairs(tbd_corr[, ,2:5], 
         title="correlogram with ggpairs()")
 ```
 This correlation matrix is missing the lines from the scatterplots, but it is cleaner visually.
@@ -689,7 +689,7 @@ This correlation matrix is missing the lines from the scatterplots, but it is cl
 ### Final Full Correlation Matrix
 
 ```{r corr9, echo=FALSE, dev='jpeg'}
-pairs.panels(tbd_corr[,2:5], 
+pairs.panels(tbd_corr[, ,2:5], 
              hist.col="aquamarine", 
              show.points=TRUE, 
              stars=TRUE, 
