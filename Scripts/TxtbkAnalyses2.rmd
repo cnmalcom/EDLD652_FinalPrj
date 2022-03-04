@@ -15,7 +15,7 @@ library(pacman)
 ```
 
 ```{r load-pkgs, echo=FALSE}
-pacman::p_load(edld652, tidyverse, psych, rio, here, forcats, arrow, dplyr, stringr, readr, tidyr, corrplot, Hmisc, scales, RColorBrewer, ggmap, devtools, leaidr, piggyback, mapproj, maptools, gitcreds, viridis, knitr, kableExtra, xtable, PerformanceAnalytics)
+pacman::p_load(edld652, tidyverse, psych, rio, here, forcats, arrow, dplyr, stringr, readr, tidyr, corrplot, Hmisc, scales, RColorBrewer, ggmap, devtools, leaidr, piggyback, mapproj, maptools, gitcreds, viridis, knitr, kableExtra, xtable, PerformanceAnalytics, corrgram, GGally)
 ```
 
 ```{r calldata2, echo=FALSE, results='hide'}
@@ -271,16 +271,50 @@ print(xtable(myXT, caption = "Correlation Table for Textbook Expenditure"), capt
 ```
 
 ```{r corr6, echo=FALSE, dev='jpeg'}
-corrplot(cor(tbd_corr), method = 'ellipse', type = 'lower', addCoef.col = "black",    # Change font size of correlation coefficients
-         number.cex = 0.5, col = COL2('PRGn', 10))
+corrplot(cor(tbd_corr), 
+         method = 'ellipse', 
+         type = 'lower', 
+         addCoef.col = "black",
+         tl.col = "black",
+         cl.ratio = 0.15, # wider spaced color legend
+         tl.srt = 45, # labels at 45 degree angle
+         number.cex = 0.5, # Change font size of correlation coefficients
+         bg = "light yellow",
+         col = COL2('PRGn', 10), # diverging color scale
+         title = "Correlation Matrix", 
+         mar=c(0,0,2,0)) #adjust title height
 
 ```
 
 
 
-Correlation Matrix - how to change colors, labels, font size?
+Correlation Matrix - how to change colors, labels, font size? Dislike the red font and larger font size.
 ```{r corr7, echo=FALSE, dev='jpeg'}
 chart.Correlation(tbd_corr[,2:5], title = "Textbook Expenditure Correlation Matrix")
+```
+
+Missing the lines from the scatterplots.
+```{r corr8, echo=FALSE, dev='jpeg'}
+ggpairs(tbd_corr[,2:5], 
+        title="correlogram with ggpairs()")
+```
+
+Final Version
+```{r corr9, echo=FALSE, dev='jpeg'}
+pairs.panels(tbd_corr[,2:5], 
+             hist.col="aquamarine", 
+             show.points=TRUE, 
+             stars=TRUE, 
+             gap=0.05, 
+             pch=".", 
+             ellipses=FALSE, 
+             scale=FALSE,
+             jiggle=TRUE,
+             factor=2,
+             main="Textbook Expenditure Correlation Matrix", 
+             col="plum", 
+             pty="m", 
+             font=2)
 ```
 
 ```{r districtM, echo=FALSE, results='hide'}
