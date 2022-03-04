@@ -18,6 +18,7 @@ library(pacman)
 pacman::p_load(edld652, tidyverse, psych, rio, here, forcats, arrow, dplyr, stringr, readr, tidyr, corrplot, Hmisc, scales, RColorBrewer, ggmap, devtools, leaidr, piggyback, mapproj, maptools, gitcreds, viridis, knitr, kableExtra, xtable, PerformanceAnalytics, corrgram, GGally)
 ```
 
+Data cleaning code to build the ehnicity.csv file is in another rmd that stopped working and freezes upon loading into the project.
 ```{r calldata2, echo=FALSE, results='hide'}
 ed <- read.csv("/Users/cassiemalcom/Desktop/CM2020/22_Winter Term Classes/EDLD 652_DS2/EDLD652_FinalPrj/Data/ethnicity.csv")
 
@@ -175,6 +176,11 @@ tbd_f4 <- tbd_f3 %>%
 tbd_f4
 ```
 
+```{r}
+write.csv(tbd_f4, "tbd_f4.csv")
+```
+
+
 Initial draft of p1
 ```{r p0, echo=FALSE, dev='jpeg'}
 p0 <- tbd_f4 %>%
@@ -281,7 +287,7 @@ corrplot(cor(tbd_corr),
          number.cex = 0.5, # Change font size of correlation coefficients
          bg = "light yellow",
          col = COL2('PRGn', 10), # diverging color scale
-         title = "Correlation Matrix", 
+         title = "Textbook Expenditure Correlation Matrix I", 
          mar=c(0,0,2,0)) #adjust title height
 
 ```
@@ -311,7 +317,7 @@ pairs.panels(tbd_corr[,2:5],
              scale=FALSE,
              jiggle=TRUE,
              factor=2,
-             main="Textbook Expenditure Correlation Matrix", 
+             main="Textbook Expenditure Correlation Matrix II", 
              col="plum", 
              pty="m", 
              font=2)
