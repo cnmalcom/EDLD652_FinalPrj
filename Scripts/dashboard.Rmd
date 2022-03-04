@@ -7,7 +7,7 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-pacman::p_load("tidyverse","rio","here","janitor", "usmap","maps", "colorspace","geofacet","leaidr", "viridis","ggthemes","arrow", "forcats", "ggrepel","edld652", "mapproj","albersusa" , "cowplot", "biscale", "plotly", "ggeasy", "flexdashboard")
+pacman::p_load("tidyverse","rio","here","janitor", "usmap","maps", "colorspace","geofacet","leaidr", "viridis","ggthemes","arrow", "forcats", "ggrepel","edld652", "mapproj","albersusa" , "cowplot", "biscale", "plotly", "ggeasy", "flexdashboard", "Hmisc", )
 ```
 
 # Research Question 1a
@@ -73,102 +73,11 @@ How does the the proficiently level in language and math vary across state for H
 
 
 ```{r include=FALSE}
-rla_sc <- import(here("Data", "rla_sc.csv"))  #uncomment this read from your local. 
-fis08 <- import(here("Data","fis08.csv"))
-math_sc <- import(here("Data", "math_sc.csv"))
-enroll <- import(here("Data", "dm_total.rda"))
-```
-
-```{r include=FALSE}
-math_sc <- math_sc %>% 
-  select(LEAID, STNAM, ALL_MTHHSPCTPROF, MAM_MTHHSPCTPROF, MAS_MTHHSPCTPROF, MBL_MTHHSPCTPROF, MHI_MTHHSPCTPROF, MTR_MTHHSPCTPROF, MWH_MTHHSPCTPROF, CWD_MTHHSPCTPROF, ECD_MTHHSPCTPROF, LEP_MTHHSPCTPROF,HOM_MTHHSPCTPROF)  %>% 
-  clean_names() %>% 
-  pivot_longer(cols= ends_with("prof"), 
-              names_to = "identity", 
-              values_to = "math_pctabove",
-              names_pattern = "(.*)_mthhspctprof")
-
-math_sc$math_pctabove <- sub(".*-(.*)", "\\1", math_sc$math_pctabove) 
-math_sc$math_pctabove <- as.numeric(math_sc$math_pctabove)
-math_sc$leaid <- as.character(math_sc$leaid)
-
-  
-  
-rla_sc <- rla_sc %>% 
-   select(LEAID,STNAM, ALL_RLAHSPCTPROF, MAM_RLAHSPCTPROF, MAS_RLAHSPCTPROF, MBL_RLAHSPCTPROF, MHI_RLAHSPCTPROF, MTR_RLAHSPCTPROF, MWH_RLAHSPCTPROF, CWD_RLAHSPCTPROF, ECD_RLAHSPCTPROF, LEP_RLAHSPCTPROF, HOM_RLAHSPCTPROF)  %>%  
-  clean_names() %>% 
-  pivot_longer(cols= ends_with("prof"), 
-              names_to = "identity", 
-              values_to = "rla_pctabove",
-              names_pattern = "(.*)_rlahspctprof")
-rla_sc$rla_pctabove <- sub(".*-(.*)", "\\1", rla_sc$rla_pctabove) 
-rla_sc$rla_pctabove <- as.numeric(rla_sc$rla_pctabove)
-
-
-fis08 <- fis08 %>% 
-  select(LEAID, "textbook"= V93, "member" = V33)  %>% 
-  clean_names()
-
-all <- left_join(rla_sc, math_sc) 
-all$stnam <- stringr::str_to_title(all$stnam)
-```
-
-```{r include=FALSE}
-
-a <- all %>% 
-  filter(identity == "all") %>% 
-  group_by(stnam) %>% 
-  summarise(allmath = mean(math_pctabove, na.rm = TRUE),
-            allmath_se = sd(math_pctabove, na.rm = TRUE)/sqrt(n()),
-            allrla = mean(rla_pctabove, na.rm=TRUE),
-            allrla_se = sd(rla_pctabove, na.rm = TRUE)/sqrt(n()))
-  
-lep <- all %>% 
-  filter(identity == "lep") %>%
-  group_by(stnam) %>% 
-  summarise(lepmath = mean(math_pctabove, na.rm = TRUE), 
-            lepmath_se = sd(math_pctabove, na.rm = TRUE)/sqrt(n()),
-            leprla = mean(rla_pctabove, na.rm=TRUE),
-            leprla_se = sd(rla_pctabove, na.rm = TRUE)/sqrt(n()))
-
- 
-cwd <- all %>% 
-  filter(identity == "cwd") %>% 
-  group_by(stnam) %>% 
-  summarise(cwdnmath = mean(math_pctabove, na.rm = TRUE),
-             cwdmath_se = sd(math_pctabove, na.rm = TRUE)/sqrt(n()),
-          cwdrla = mean(rla_pctabove, na.rm=TRUE),
-          cwdrla_se = sd(rla_pctabove, na.rm = TRUE)/sqrt(n()))
-
-ecd <- all %>% filter(identity == "ecd") %>% 
-  group_by(stnam) %>% 
-  summarise(ecdmath = mean(math_pctabove, na.rm = TRUE), 
-            ecdmath_se = sd(math_pctabove, na.rm = TRUE)/sqrt(n()),
-            ecdrla = mean(rla_pctabove, na.rm=TRUE),
-            ecdrla_se = sd(rla_pctabove, na.rm = TRUE)/sqrt(n()))
-
-r2a <- left_join(a, lep) %>% 
-  left_join(cwd) %>% 
-  left_join(ecd) %>% 
-  filter(!stnam == "Stnam", 
-           !stnam == "BUREAU OF INDIAN AFFAIRS")
-
-
-#Create dataset for District and State Level
-dist_r2b <- left_join(all, fis08) %>% 
-  select (stnam, leaid, textbook, member) %>% 
-  filter(!textbook <= 0) %>% 
-  mutate(perstudbook = textbook/member) %>% 
-  distinct()
-
-
-state_r2b <- dist_r2b %>% 
-  group_by(stnam) %>% 
-  summarise(stbook = sum(textbook),
-            member = sum(member)) %>% 
-  mutate(stperstudbook = stbook/member) %>% 
-  left_join(r2a)
-
+#rla_sc <- import(here("Data", "rla_sc.csv"))  #uncomment this read from your local. 
+r2a <- import(here("Data","r2a.csv"))
+#math_sc <- import(here("Data", "math_sc.csv"))
+state_r2b <- import(here("Data", "state_r2b.csv"))
+dist_r2b <- import(here("Data", "dist_r2b.csv"))
 ```
 
 ```{r include=FALSE}
@@ -470,14 +379,15 @@ Column {.tabset data-width=500}
 -----------------------------------------------------------------------
 
 ### Virginia
-```{r include=FALSE}
+```{r eval=FALSE, include=FALSE}
 book_va <- dist_r2b %>% 
   filter(stnam == "Virginia")
-  
-va <- lea_get(state = "va") %>% 
-    sf::st_as_sf() 
 
-va_book <- left_join(va, book_va,by = c("GEOID" = "leaid")) %>% 
+va <- lea_get(state = "va") %>% 
+    sf::st_as_sf() %>% 
+  rename(leaid = GEOID)
+
+va_book <- left_join(va, book_va) %>% 
   ggplot() +
   geom_sf(aes(fill = perstudbook), size = 0.1) +
   scale_fill_continuous_divergingx(palette = "Earth",  labels = scales::dollar) +
@@ -492,13 +402,13 @@ va_book <- left_join(va, book_va,by = c("GEOID" = "leaid")) %>%
        title = "Virginia")
 ```
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 ggplotly(va_book)
 ```
 
 ### West Virginia
 
-```{r include=FALSE}
+```{r eval=FALSE, include=FALSE}
 textbook_wv <- dist_r2b %>% 
   filter(stnam == "West Virginia")
   
@@ -506,7 +416,7 @@ textbook_wv <- dist_r2b %>%
 wv <- lea_get(state = "wv") %>% 
     sf::st_as_sf() 
 
-wv_book <- left_join(wv, textbook_wv,by = c("GEOID" = "leaid")) %>% 
+wv_book <- left_join(wv, textbook_wv) %>% 
   ggplot() +
   geom_sf(aes(fill = perstudbook), size = 0.1) +
   theme_minimal()+
@@ -523,7 +433,7 @@ wv_book <- left_join(wv, textbook_wv,by = c("GEOID" = "leaid")) %>%
 ```
 
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 ggplotly(wv_book)
 ```
 
@@ -624,6 +534,7 @@ state_r2b%>%
 
 
 
+
 # Research Question 3 
 
 Variables {.sidebar}
@@ -633,7 +544,7 @@ textbk_exp_per_student - Textbook Expenditure per Student
 percentM - Percent of student population in a school district identifying as minorities
 percentW - Percent of student population in a school district identifying as white
 
-```{r ethnicD include=FALSE}
+```{r ethnicD, include=FALSE}
 tbd_f4 <- import(here("Data", "tbd_f4.csv"))
 ```
 
@@ -642,20 +553,20 @@ Column 1 {data-width=400}
 
 ### Correlation Coefficients Table
 
-```{r corr include=FALSE}
+```{r corr, include=FALSE}
 tbd_corr <- tbd_f4 %>%
   select(total, textbk_exp_per_student, percentM, percentW)
 
 tbd_corr
 ```
 
-```{r corr2 include=FALSE}
+```{r corr2, include=FALSE}
 mycorr <- rcorr(as.matrix(tbd_corr))
 
 mycorr
 ```
 
-```{r corr3 include=FALSE}
+```{r corr3, include=FALSE}
 corstarsl <- function(tbd_corr){ 
   require(Hmisc) 
   x <- as.matrix(tbd_corr) 
@@ -684,7 +595,7 @@ corstarsl(tbd_corr)
 xtable(corstarsl(tbd_corr[,1:5]))
 ```
 
-```{r corr4 include=FALSE}
+```{r corr4, include=FALSE}
 myXT <- xtable(corstarsl(tbd_corr[,2:5]))
 
 names(myXT) <- c("Total Number of Students per District", "Textbook Expenditure per Student", "Percent of Student Population Identifying as Minority", "Percent of Student Population Identifying as White")
@@ -793,6 +704,5 @@ pairs.panels(tbd_corr[,2:5],
              pty="m", 
              font=2)
 ```
-
 
 
