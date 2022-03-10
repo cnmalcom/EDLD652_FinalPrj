@@ -1042,7 +1042,171 @@ us_map
 
 ```
 
-***Research Question 3
+# **Research Question 3:** What is the relationship, if any, between textbook expenditure by school district and percent of minority students in the school district's population?
+
+```{r ethnicD, include=FALSE}
+tbd_f4 <- import(here("Data", "tbd_f4.csv"))
+```
+
+## **Variables:**
+
+* LEAID - ID number for each school district
+
+* total - Total number of students in a school district
+
+* textbk_exp_per_student - Textbook Expenditure per Student
+
+* percentM - Percent of student population in a school district identifying as minorities
+
+* percentW - Percent of student population in a school district identifying as white
+
+## **Data Source:** https://usafacts.org/
+
+### Correlation Coefficients Table
+```{r corr, include=FALSE}
+tbd_corr <- tbd_f4 %>%
+  select(total, textbk_exp_per_student, percentM, percentW)
+
+tbd_corr
+```
+
+```{r corr2, include=FALSE}
+mycorr <- rcorr(as.matrix(tbd_corr))
+
+mycorr
+```
+
+```{r corr3, include=FALSE}
+corstarsl <- function(tbd_corr){ 
+  require(Hmisc) 
+  x <- as.matrix(tbd_corr) 
+  R <- rcorr(x)$r 
+  p <- rcorr(x)$P 
+
+  mystars <- ifelse(p < .001, "***", ifelse(p < .01, "** ", ifelse(p < .05, "* ", " ")))
+
+  R <- format(round(cbind(rep(-1.11, ncol(x)), R), 2))[,-1] 
+
+  Rnew <- matrix(paste(R, mystars, sep=""), ncol=ncol(x)) 
+  diag(Rnew) <- paste(diag(R), " ", sep="") 
+  rownames(Rnew) <- colnames(x) 
+  colnames(Rnew) <- paste(colnames(x), "", sep="") 
+
+  Rnew <- as.matrix(Rnew)
+  Rnew[upper.tri(Rnew, diag = TRUE)] <- ""
+  Rnew <- as.data.frame(Rnew) 
+
+  Rnew <- cbind(Rnew[1:length(Rnew)])
+  return(Rnew) 
+}
+
+corstarsl(tbd_corr)
+
+myXT <- xtable(corstarsl(tbd_corr[, ,2:5]))
+
+names(myXT) <- c("Total Number of Students per District", "Textbook Expenditure per Student", "Percent of Student Population Identifying as Minority", "Percent of Student Population Identifying as White")
+```
+
+```{r}
+kbl(myXT, caption = "Correlation Table for Textbook Expenditure") %>%
+  kable_classic(lightable_options = "striped")
+  
+```
+
+### Initial Scatterplot
+```{r initialS}
+p0 <- tbd_f4 %>%
+  ggplot(aes(x = textbk_exp_per_student, y = percentM)) +
+  geom_point()
+
+p0
+```
+
+### Scatterplot for Minority Students
+```{r p1, echo=FALSE, dev='jpeg'}
+p1 <- tbd_f4 %>%
+  ggplot(aes(x = textbk_exp_per_student, y = percentM)) +
+  geom_point(aes(color = textbk_exp_per_student), size=1) +
+  scale_colour_gradient(low = "light green",
+                       high = "blue", name = "Cost") +
+  scale_x_continuous(labels = comma) +
+       labs(title = "Relationship Between Percent Minority Students and Textbook Expenditure",
+       y = "Percent of Minority Students in School District",
+       x= "Amount of Textbook Expenditure per Student by School District") +
+  theme(panel.background = element_rect(fill = "cornsilk", colour = "yellow"))
+
+p1
+```
+
+### Scatterplot for White Students
+```{r p2, echo=FALSE, dev='jpeg'}
+p2 <- tbd_f4 %>%
+  ggplot(aes(x = textbk_exp_per_student, y = percentW)) +
+  geom_point(aes(color = textbk_exp_per_student), size=1) +
+  scale_colour_gradient(low = "light green",
+                       high = "blue", name = "Cost") +
+  scale_x_continuous(labels = comma) +
+       labs(title = "Relationship Between Percent White Students and Textbook Expenditure",
+       y = "Percent of White Students in School District",
+       x= "Amount of Textbook Expenditure per Student by School District") +
+  theme(panel.background = element_rect(fill = "cornsilk", colour = "yellow"))
+
+p2
+```
+
+### Lowerbound Correlation Matrix
+```{r corr6}
+corrplot(cor(tbd_corr), 
+         method = 'ellipse', 
+         type = 'lower', 
+         addCoef.col = "black",
+         tl.col = "black",
+         cl.ratio = 0.15, # wider spaced color legend
+         tl.srt = 45, # labels at 45 degree angle
+         number.cex = 0.5, # Change font size of correlation coefficients
+         bg = "light yellow",
+         col = COL2('PRGn', 10), # diverging color scale
+         title = "Textbook Expenditure Correlation Matrix I", 
+         mar=c(0,0,2,0)) #adjust title height
+
+```
+The ovals display the type of correlation direction, but there are no significance asterisks included for the correlations.
+
+### Initial Full Correlation Matrix
+```{r corr7, echo=FALSE, dev='jpeg'}
+chart.Correlation(tbd_corr[, ,2:5], title = "Textbook Expenditure Correlation Matrix")
+```
+This initial version seems to busy with the large vs. small font sizes and red lines.
+
+### Second Full Correlation Matrix
+```{r corr8, echo=FALSE, dev='jpeg'}
+ggpairs(tbd_corr[, ,2:5], 
+        title="correlogram with ggpairs()")
+```
+This correlation matrix is missing the lines from the scatterplots, but it is cleaner visually with some overlap in x-axis labels.
+
+### Final Full Correlation Matrix
+```{r corr9, echo=FALSE, dev='jpeg'}
+pairs.panels(tbd_corr[, ,2:5], 
+             hist.col="aquamarine", 
+             show.points=TRUE, 
+             stars=TRUE, 
+             gap=0.05, 
+             pch=".", 
+             ellipses=FALSE, 
+             scale=FALSE,
+             jiggle=TRUE,
+             factor=2,
+             main="Textbook Expenditure Correlation Matrix II", 
+             col="plum", 
+             pty="m", 
+             font=2)
+```
+The color is more easily changed via the pairs.panels function.
+
+### Oregon Colorblind Friendly Version - Visualizing textbook spending for school district
+
+![Color-blind OR Plot](Data/ORtxtbk_colorblind.png)
 
 
 
