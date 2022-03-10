@@ -1206,7 +1206,7 @@ The color is more easily changed via the pairs.panels function.
 
 ### Oregon Colorblind Friendly Version - Visualizing textbook spending for school district
 
-![Color-blind OR Plot](Data/ORtxtbk_colorblind.png)
+![Color-blind OR Plot](/Users/cassiemalcom/Desktop/CM2020/22_Winter Term Classes/EDLD 652_DS2/EDLD652_FinalPrj/Data/ORtxtbk_colorblind.png)
 
 
 
